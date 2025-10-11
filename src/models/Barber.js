@@ -1,51 +1,83 @@
-const mongoose = require('mongoose');
+import mongoose from "mongoose";
 
-const barberShopSchema = new mongoose.Schema({
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User', // References the Users collection
-    required: true
+const BarberSchema = new mongoose.Schema({
+  firstName: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+  lastName: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    lowercase: true,
+    trim: true,
+  },
+  phone: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+  password: {
+    type: String,
+    required: true,
   },
   shopName: {
     type: String,
     required: true,
-    trim: true
-  },
-  passWord: {
-    type: String,
-    required: true,
-    trim: true
+    trim: true,
   },
   location: {
     type: String,
     required: true,
-    trim: true
   },
-  role: {
-    type: String,
-    default:"barber",
-    immutable: true
+  services: {
+    type: [String],
+    default: [],
   },
-  services: [{
+  shopImage: {
+    type: String, // store image URL or path
+    default: null,
+  },
+  barberImage: {
     type: String,
-    trim: true
-  }],
-  rating: {
-    type: Number,
-    min: 0,
-    max: 5,
-    default: 4,
-    immutable: true
-  }
-}, {
-  timestamps: true 
+    default: null,
+  },
+  aadharNumber: {
+    type: String,
+    required: true,
+    match: /^\d{12}$/,
+  },
+  dob: {
+    type: Date,
+    required: true,
+  },
+  gender: {
+    type: String,
+    enum: ["Male", "Female", "Other"],
+    required: true,
+  },
+  aadharFront: {
+    type: String,
+    required: true,
+  },
+  aadharBack: {
+    type: String,
+    required: true,
+  },
+  selfieWithAadhar: {
+    type: String,
+    default: null,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
 });
 
-// Index for better query performance
-barberShopSchema.index({ location: 1 });
-barberShopSchema.index({ rating: -1 });
-barberShopSchema.index({ userId: 1 });
-
-const BarberShop = mongoose.model('BarberShop', barberShopSchema);
-
-module.exports = BarberShop;
+export default mongoose.models.Barber || mongoose.model("Barber", BarberSchema);

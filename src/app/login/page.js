@@ -17,13 +17,14 @@ export default function LogIn() {
     console.log('Session data:', session)
   }, [session, status])
 
-  // Redirect to home page after successful login
+  // Redirect to home page after successful login - IMPROVED
   useEffect(() => {
-    if (session) {
+    if (status === 'authenticated' && session) {
       console.log('User logged in, redirecting to home...')
-      router.push('/') // Redirect to home page or dashboard
+      // Use replace instead of push to avoid back button issues
+      router.replace('/')
     }
-  }, [session, router])
+  }, [session, status, router])
 
   // Show loading state while session is being fetched
   if (status === "loading") {
@@ -37,28 +38,28 @@ export default function LogIn() {
     )
   }
 
-  // If user is already signed in, show their info
-  if (session) {
+  // If user is authenticated, show loading screen instead of welcome screen
+  if (status === 'authenticated' && session) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0f172a] text-white">
         <div className="bg-[#111827] p-8 rounded-lg w-full max-w-md shadow-lg text-center">
-          <h2 className="text-2xl font-bold mb-4">Welcome!</h2>
-          <div className="mb-4">
-            {session.user.image && (
-              <img 
-                src={session.user.image} 
-                alt="Profile" 
-                className="w-16 h-16 rounded-full mx-auto mb-2"
-              />
-            )}
-            <p className="text-lg">{session.user.name}</p>
-            <p className="text-sm text-gray-400">{session.user.email}</p>
-          </div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-4"></div>
+          <h2 className="text-xl font-bold mb-2">Redirecting...</h2>
+          <p className="text-sm text-gray-400">Taking you to the home page</p>
+          
+          {/* Fallback button in case redirect doesn't work */}
+          <button 
+            onClick={() => router.replace('/')}
+            className="mt-4 w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 rounded-md"
+          >
+            Go to Home
+          </button>
+          
           <button 
             onClick={() => signOut()}
-            className="w-full bg-red-500 hover:bg-red-600 text-white font-medium py-2 rounded-md"
+            className="mt-2 w-full bg-red-500 hover:bg-red-600 text-white font-medium py-1 rounded-md text-sm"
           >
-            Sign out
+            Sign out instead
           </button>
         </div>
       </div>
@@ -92,23 +93,23 @@ export default function LogIn() {
     }
   }
 
-  // Handle OAuth login
+  // Handle OAuth login - IMPROVED
   const handleOAuthLogin = async (provider) => {
     setError('')
-    setIsLoading(true)
     
     try {
       console.log(`Attempting ${provider} login...`)
-      const result = await signIn(provider, { 
-        redirect: true,
+      
+      // For OAuth, let NextAuth handle the redirect completely
+      await signIn(provider, { 
         callbackUrl: '/' 
       })
-      console.log('OAuth result:', result)
+      
+      // This line might not execute due to redirect
+      console.log('OAuth login initiated')
     } catch (error) {
-      setError('Login failed')
+      setError('Login failed: ' + error.message)
       console.error('OAuth error:', error)
-    } finally {
-      setIsLoading(false)
     }
   }
 
@@ -137,6 +138,7 @@ export default function LogIn() {
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-3 py-2 rounded-md bg-[#1f2937] border border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               placeholder="demo@example.com"
+              required
             />
           </div>
 
@@ -148,6 +150,7 @@ export default function LogIn() {
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-3 py-2 rounded-md bg-[#1f2937] border border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               placeholder="password123"
+              required
             />
           </div>
 
@@ -198,6 +201,25 @@ export default function LogIn() {
             />
             GitHub
           </button>
+        </div>
+
+        <div className="mt-6 text-center space-y-2">
+          <p className="text-sm text-gray-400">
+            Don't have an account?{' '}
+            <a href="/signup" className="text-indigo-400 hover:text-indigo-300">
+              Sign up
+            </a>
+          </p>
+          <p className="text-sm text-gray-400">
+            Are you a barber?{' '}
+            <a href="/barberLogin" className="text-green-400 hover:text-green-300">
+              Barber Login
+            </a>
+            {' '}or{' '}
+            <a href="/barberSignUp" className="text-green-400 hover:text-green-300">
+              Barber Signup
+            </a>
+          </p>
         </div>
       </div>
     </div>

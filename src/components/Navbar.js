@@ -38,8 +38,8 @@ const Navbar = () => {
               </Link>
             </li>
             <li>
-              <Link href="/contact" className="hover:text-blue-400 transition-colors">
-              Shop
+              <Link href="/barberLogin" className="hover:text-blue-400 transition-colors">
+              My Shop
               </Link>
             </li>
           </ul>

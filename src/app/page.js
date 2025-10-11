@@ -1,13 +1,17 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { signIn,signOut, } from "next-auth/react";
+import { useSession, signIn, signOut } from "next-auth/react"
+
+
 export default function Home() {
   const [city, setCity] = useState("");
   const [suggestions, setSuggestions] = useState([]);
-  const [disable,setDisable]=useState([]);
   const router = useRouter();
-
+   const { data: session, status } = useSession();
+  const handleOn=()=>{
+   return status==="unauthenticated"
+  }
   const handleSearch = () => {
     if (!city) return;
     router.push(`/search?city=${encodeURIComponent(city)}`); // ✅ redirect
@@ -66,9 +70,9 @@ export default function Home() {
             className="bg-white rounded-3xl rounded-r-none text-black p-2 w-96 text-center"
           />
           <button
-            
+            disabled={handleOn()}
             onClick={handleSearch}
-            className="bg-red-500 text-white px-4 rounded-3xl rounded-l-none hover:bg-red-600"
+            className="bg-red-500 disabled:bg-slate-300 text-white px-4 rounded-3xl rounded-l-none hover:bg-red-600"
           >
             Go
           </button>

@@ -1,134 +1,115 @@
-// lib/auth.js - With MongoDB integration
-import GoogleProvider from 'next-auth/providers/google'
-import GitHubProvider from 'next-auth/providers/github'
-import CredentialsProvider from 'next-auth/providers/credentials'
-import { MongoDBAdapter } from "@auth/mongodb-adapter"
-import { MongoClient } from "mongodb"
-
-// MongoDB connection
-const client = new MongoClient(process.env.MONGODB_URI || "mongodb://localhost:27017/barber-app")
-const clientPromise = client.connect()
+import GoogleProvider from "next-auth/providers/google";
+import GitHubProvider from "next-auth/providers/github";
+import CredentialsProvider from "next-auth/providers/credentials";
+import { MongoDBAdapter } from "@auth/mongodb-adapter";
+import { clientPromise } from "@/lib/db";
+import bcrypt from "bcryptjs";
+import User from "@/models/User";
+import dbConnect from "@/lib/db";
 
 export const authOptions = {
-  // Use MongoDB adapter to save users/sessions/accounts to database
   adapter: MongoDBAdapter(clientPromise),
-  
+  secret: process.env.NEXTAUTH_SECRET || "fallback-secret-for-development-only",
+
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || "",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      allowDangerousEmailAccountLinking: true,
     }),
-    
     GitHubProvider({
-      clientId: process.env.GITHUB_ID || "",
-      clientSecret: process.env.GITHUB_SECRET || "",
+      clientId: process.env.GITHUB_CLIENT_ID,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET,
+      allowDangerousEmailAccountLinking: true,
     }),
-    
     CredentialsProvider({
-      name: 'credentials',
+      name: "Credentials",
       credentials: {
-        email: { 
-          label: 'Email', 
-          type: 'email',
-          placeholder: 'Enter your email'
-        },
-        password: { 
-          label: 'Password', 
-          type: 'password',
-          placeholder: 'Enter your password'
-        }
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          return null
+          throw new Error("Email and password required");
         }
 
-        // Demo credentials for testing
-        if (credentials.email === "demo@example.com" && credentials.password === "password123") {
-          return {
-            id: "demo-user",
-            email: credentials.email,
-            name: "Demo User",
-          }
+        await dbConnect();
+        
+        const user = await User.findOne({ email: credentials.email });
+        if (!user) {
+          throw new Error("No user found with this email");
         }
 
-        // Add your real authentication logic here
-        // You can query your User model here if needed
-        return null
-      }
-    })
+        if (!user.password) {
+          throw new Error("Please sign in with your social account");
+        }
+
+        const isValid = await user.comparePassword(credentials.password);
+        if (!isValid) {
+          throw new Error("Invalid password");
+        }
+
+        return {
+          id: user._id.toString(),
+          email: user.email,
+          name: user.username,
+          role: user.role,
+        };
+      },
+    }),
   ],
-  
-  pages: {
-    signIn: '/login',
-  },
-  
-  callbacks: {
-    async signIn({ user, account, profile }) {
-      console.log('🔐 Sign in attempt:', { 
-        user: user.email, 
-        provider: account?.provider 
-      })
-      return true
-    },
-    
-    async session({ session, user }) {
-      // Add user ID from database to session
-      if (user) {
-        session.user.id = user.id
-        session.user.role = user.role || null
-      }
-      
-      console.log('📱 Session created:', {
-        userId: session.user.id,
-        email: session.user.email,
-        role: session.user.role
-      })
-      
-      return session
-    },
-    
-    async redirect({ url, baseUrl }) {
-      console.log('🔄 Redirecting:', { url, baseUrl })
-      
-      // Handle undefined values safely
-      if (!url) return baseUrl
-      if (!baseUrl) return '/'
-      
-      // Allow relative callback URLs
-      if (url.startsWith("/")) return `${baseUrl}${url}`
-      
-      // Allow callback URLs on the same origin
-      try {
-        const urlObj = new URL(url)
-        const baseUrlObj = new URL(baseUrl)
-        if (urlObj.origin === baseUrlObj.origin) return url
-      } catch (error) {
-        console.error('Redirect URL error:', error)
-      }
-      
-      return baseUrl
-    }
-  },
-  
-  events: {
-    async createUser({ user }) {
-      console.log('👤 New user created in database:', {
-        id: user.id,
+
+callbacks: {
+  async signIn({ user, account, profile }) {
+    await dbConnect();
+
+    let existingUser = await User.findOne({ email: user.email });
+
+    if (!existingUser) {
+      // Create a new user for first-time OAuth
+      existingUser = await User.create({
         email: user.email,
-        name: user.name
-      })
-    },
-    
-    async signIn({ user, account, profile }) {
-      console.log(`✅ User ${user.email} signed in with ${account?.provider}`)
-    },
-    
-    async signOut({ session }) {
-      console.log(`👋 User signed out`)
+        username: user.name,
+        role: "customer",
+        image: user.image || null,
+      });
+    } else {
+      // Optional: update profile fields if missing
+      let updated = false;
+
+      if (!existingUser.username && user.name) {
+        existingUser.username = user.name;
+        updated = true;
+      }
+      if (!existingUser.image && user.image) {
+        existingUser.image = user.image;
+        updated = true;
+      }
+      if (!existingUser.role) {
+        existingUser.role = "customer";
+        updated = true;
+      }
+
+      if (updated) await existingUser.save();
+    }
+
+    // ✅ Always allow sign in for OAuth, even if email already exists
+    return true;
+  },
+}
+,
+
+  pages: {
+    signIn: '/login', // This matches your app/login/page.js structure
+  },
+
+  session: {
+    strategy: "jwt",
+  },
+
+  events: {
+    async signIn({ user, account }) {
+      console.log("✅ User signed in:", user.email, "via", account.provider);
     },
   },
-  
-  secret: process.env.NEXTAUTH_SECRET || "fallback-secret-for-development",
-  debug: process.env.NODE_ENV === 'development',
-}
+};

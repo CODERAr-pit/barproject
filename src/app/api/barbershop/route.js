@@ -1,38 +1,90 @@
-import { NextResponse } from "next/server";
-import connectDB from "@/lib/db";
+import mongoose from "mongoose";
 import BarberShop from "@/models/Barber";
-import { getServerSession } from "next-auth"; // assuming you're using next-auth
-import { authOptions } from "../auth/[...nextauth]/route";
+import dbConnect from "@/lib/db";
+import { NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
 
 export async function POST(req) {
-  await connectDB();
-
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
+    await dbConnect();
+    
+    // Parse FormData
+    const formData = await req.formData();
+    
+    // Extract form fields
+    const firstName = formData.get('firstName');
+    const lastName = formData.get('lastName');
+    const email = formData.get('email');
+    const phone = formData.get('phone');
+    const password = formData.get('password');
+    const shopName = formData.get('shopName');
+    const location = formData.get('location');
+    const services = JSON.parse(formData.get('services') || '[]');
+    const aadharNumber = formData.get('aadharNumber');
+    const dob = formData.get('dob');
+    const gender = formData.get('gender');
+    
+    // Validate required fields
+    if (!firstName || !lastName || !email || !phone || !password || !shopName || !location || !aadharNumber || !dob || !gender) {
       return NextResponse.json(
-        { message: "Unauthorized" },
-        { status: 401 }
+        { error: "All required fields must be filled" },
+        { status: 400 }
       );
     }
 
-    const { shopName, location, services } = await req.json();
+    // Check if barber already exists
+    const existingBarber = await BarberShop.findOne({ email });
+    if (existingBarber) {
+      return NextResponse.json(
+        { error: "A barber with this email already exists" },
+        { status: 400 }
+      );
+    }
 
-    const newShop = new BarberShop({
-      userId: session.user.id, 
+    // Hash password before saving
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    // Create new barber
+    const barber = await BarberShop.create({
+      firstName,
+      lastName,
+      email,
+      phone,
+      password: hashedPassword,
       shopName,
       location,
       services,
+      aadharNumber,
+      dob: new Date(dob),
+      gender,
+      // Handle file uploads if needed
+      aadharFront: formData.get('aadharFront')?.name || null,
+      aadharBack: formData.get('aadharBack')?.name || null,
+      selfieWithAadhar: formData.get('selfieWithAadhar')?.name || null,
     });
 
-    await newShop.save();
+    // Remove password from response
+    const { password: _, ...barberData } = barber.toObject();
 
-    return NextResponse.json(newShop, { status: 201 });
-  } catch (error) {
-    console.error(error);
     return NextResponse.json(
-      { message: "Failed to register barber shop" },
+      { message: "Barber registered successfully", barber: barberData },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error("Barber registration error:", error);
+
+    if (error.code === 11000) {
+      return NextResponse.json(
+        { error: "A barber with this email already exists" },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
 }
+
+// GET method removed - barber registration doesn't require authentication
