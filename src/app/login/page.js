@@ -47,7 +47,7 @@ export default function LogIn() {
           <h2 className="text-xl font-bold mb-2">Redirecting...</h2>
           <p className="text-sm text-gray-400">Taking you to the home page</p>
           
-          {/* Fallback button in case redirect doesn't work */}
+          {/* Fallback button in case redirect doesn\u0027t work */}
           <button 
             onClick={() => router.replace('/')}
             className="mt-4 w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 rounded-md"
@@ -205,7 +205,7 @@ export default function LogIn() {
 
         <div className="mt-6 text-center space-y-2">
           <p className="text-sm text-gray-400">
-            Don't have an account?{' '}
+            Don&apos;t have an account?{' '}
             <a href="/signup" className="text-indigo-400 hover:text-indigo-300">
               Sign up
             </a>

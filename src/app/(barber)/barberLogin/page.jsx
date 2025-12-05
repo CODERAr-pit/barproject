@@ -29,10 +29,13 @@ export default function BarberSignup() {
 
       const data = await res.json();
 
-      if (res.ok) {
-        // Login successful, redirect to dashboard
-        router.push(data.redirectUrl);
-      } else {
+      if (data.success) {
+      // ✅ Store barber details locally
+      localStorage.setItem("barber", JSON.stringify(data.user));
+
+      // ✅ Redirect to dashboard
+      router.push(data.redirectUrl);
+    } else {
         // Show error message
         alert(data.error || "Login failed");
       }

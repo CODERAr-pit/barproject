@@ -1,34 +1,35 @@
 "use client";
+import { useRouter } from "next/navigation";
 
 export default function BarberCard({ data }) {
-  // If data is not provided or empty, show message
+  const router = useRouter();  // ✅ initialize the router
+
   if (!data || data.length === 0) {
     return (
       <div className="p-6 text-center">
-        <p className="text-gray-500 text-lg">
-          No barbers found in this area
-        </p>
+        <p className="text-gray-500 text-lg">No barbers found in this area</p>
         <p className="text-gray-400 text-sm mt-2">
           Try searching in a different city
         </p>
       </div>
     );
   }
-const handleAppointment=()=>{
-    
-}
+
+  const handleAppointment = (id) => {
+    router.push(`/barber/${id}`);
+  };
+
   return (
-    <div onClick={handleAppointment} className="p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+    <div className="p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
       {data.map((barber) => (
         <div
           key={barber._id}
           className="bg-white shadow-lg rounded-2xl p-6 border hover:shadow-xl transition-all duration-300 hover:scale-105"
         >
-          {/* Barber Image */}
           <div className="w-full h-48 bg-gray-200 rounded-lg mb-4 flex items-center justify-center">
             {barber.barberImage ? (
-              <img 
-                src={barber.barberImage} 
+              <img
+                src={barber.barberImage}
                 alt={barber.shopName}
                 className="w-full h-full object-cover rounded-lg"
               />
@@ -37,12 +38,16 @@ const handleAppointment=()=>{
             )}
           </div>
 
-          {/* Barber Info */}
           <div className="space-y-2">
             <h2 className="text-xl font-bold text-gray-800 mb-2">
               {barber.shopName}
             </h2>
-            
+            {barber.isAvailable === false ? (
+              <div className="text-sm text-red-600">Not available{barber.nextAvailableAt ? ` • Next: ${new Date(barber.nextAvailableAt).toLocaleString()}` : ""}</div>
+            ) : (
+              <div className="text-sm text-green-600">Available now</div>
+            )}
+
             <div className="flex items-center text-gray-600 mb-2">
               <span className="text-sm">📍</span>
               <span className="ml-1 text-sm">{barber.location}</span>
@@ -55,13 +60,16 @@ const handleAppointment=()=>{
 
             <div className="flex items-center text-gray-600 mb-2">
               <span className="text-sm">👤</span>
-              <span className="ml-1 text-sm">{barber.firstName} {barber.lastName}</span>
+              <span className="ml-1 text-sm">
+                {barber.firstName} {barber.lastName}
+              </span>
             </div>
 
-            {/* Services */}
             {barber.services && barber.services.length > 0 && (
               <div className="mt-3">
-                <p className="text-sm font-medium text-gray-700 mb-2">Services:</p>
+                <p className="text-sm font-medium text-gray-700 mb-2">
+                  Services:
+                </p>
                 <div className="flex flex-wrap gap-1">
                   {barber.services.slice(0, 3).map((service, index) => (
                     <span
@@ -80,8 +88,10 @@ const handleAppointment=()=>{
               </div>
             )}
 
-            {/* Action Button */}
-            <button onClick={handleAppointment} className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors">
+            <button
+              onClick={() => handleAppointment(barber._id)}
+              className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+            >
               Book Appointment
             </button>
           </div>

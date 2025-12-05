@@ -3,6 +3,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession, signIn, signOut } from "next-auth/react"
 
+export const dynamic = 'force-dynamic';
+
 
 export default function Home() {
   const [city, setCity] = useState("");

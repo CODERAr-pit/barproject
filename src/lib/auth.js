@@ -60,6 +60,24 @@ export const authOptions = {
   ],
 
 callbacks: {
+  async jwt({ token, user }) {
+    // Persist user id and role on the token for session usage
+    if (user) {
+      token.id = user.id || user._id?.toString();
+      if (user.role) token.role = user.role;
+    }
+    return token;
+  },
+
+  async session({ session, token }) {
+    // Expose id (and role if available) on the client session
+    if (token) {
+      session.user.id = token.id || token.sub || session.user.id;
+      if (token.role && !session.user.role) session.user.role = token.role;
+    }
+    return session;
+  },
+
   async signIn({ user, account, profile }) {
     await dbConnect();
 

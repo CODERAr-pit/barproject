@@ -2,6 +2,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import SessionWrapper from "@/components/SessionWrapper";
+import Footer from "@/components/Footer";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -22,7 +23,8 @@ export default function RootLayout({ children }) {
         
         <div className="relative z-10">
           <Navbar/>
-          {children}
+          <main className="min-h-[calc(100vh-200px)]">{children}</main>
+          <Footer/>
         </div>
         </SessionWrapper>
       </body>

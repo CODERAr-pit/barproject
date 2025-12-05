@@ -78,6 +78,61 @@ const BarberSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  upvote: {
+    type: Number,
+    default: 0,
+  },
+  downvote: {
+    type: Number,
+    default: 0,
+  },
+  isAvailable: {
+    type: Boolean,
+    default: true,
+  },
+  nextAvailableAt: {
+    type: Date,
+    default: null,
+  },
+  
+  // ✅ FIXED SCHEDULE SECTION
+  schedule: {
+    monday: {
+      start: { type: String, default: "09:00" },
+      end: { type: String, default: "17:00" },
+      isOff: { type: Boolean, default: false },
+    },
+    tuesday: {
+      start: { type: String, default: "09:00" },
+      end: { type: String, default: "17:00" },
+      isOff: { type: Boolean, default: false },
+    },
+    wednesday: {
+      start: { type: String, default: "09:00" },
+      end: { type: String, default: "17:00" },
+      isOff: { type: Boolean, default: false },
+    },
+    thursday: {
+      start: { type: String, default: "09:00" },
+      end: { type: String, default: "17:00" },
+      isOff: { type: Boolean, default: false },
+    },
+    friday: {
+      start: { type: String, default: "09:00" },
+      end: { type: String, default: "20:00" }, // Late night!
+      isOff: { type: Boolean, default: false },
+    },
+    saturday: {
+      start: { type: String, default: "10:00" },
+      end: { type: String, default: "15:00" },
+      isOff: { type: Boolean, default: false },
+    },
+    sunday: {
+      start: { type: String, default: "00:00" },
+      end: { type: String, default: "00:00" },
+      isOff: { type: Boolean, default: true }, // Default Day Off
+    },
+  },
 });
 
 export default mongoose.models.Barber || mongoose.model("Barber", BarberSchema);

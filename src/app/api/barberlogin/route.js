@@ -3,13 +3,7 @@ import connectDB from "@/lib/db";
 import BarberShop from "@/models/Barber";
 import bcrypt from "bcryptjs";
 
-// Test endpoint to verify API is working
-export async function GET() {
-  return NextResponse.json(
-    { message: "Barber login API is working! Use POST to login." },
-    { status: 200 }
-  );
-}
+
 
 export async function POST(req) {
   try {
@@ -45,17 +39,14 @@ export async function POST(req) {
 
     // Return redirect URL instead of using NextResponse.redirect
     const username = user.email.split("@")[0];
-    const redirectUrl = `/(barber)/dashboard/${username}`;
+    const redirectUrl = `/dashboard/${username}`;
 
     return NextResponse.json(
       {
         success: true,
         message: "Login successful",
         redirectUrl,
-        user: {
-          email: user.Email,
-          username,
-        },
+        user,
       },
       { status: 200 }
     );
