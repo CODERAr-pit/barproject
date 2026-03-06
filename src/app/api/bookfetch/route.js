@@ -1,75 +1,100 @@
-import { NextResponse } from "next/server";
 import dbConnect from "@/lib/db";
 import Booking from "@/models/Booking";
-import Barber from "@/models/Barber"; // Required for .populate to work
+import { NextResponse } from "next/server";
 
-// Helper: Fetch what is already BOOKED (for slot calculation)
-const getBusySlots = async (barberID, dateString) => {
-  const startOfDay = new Date(`${dateString}T00:00:00.000Z`);
-  const endOfDay = new Date(`${dateString}T23:59:59.999Z`);
 
-  // Only consider confirmed bookings; Booking schema uses startTime/endTime
-  return await Booking.find({
-    barber: barberID,
-    startTime: { $gte: startOfDay, $lte: endOfDay },
-    status: "confirmed",
-  });
-};
+export async function GET(req){
+  try{const body=req.json();
+  const {barber_id}=body.barber;
 
-export async function GET(request) {
-  try {
-    await dbConnect();
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
-    const barberId = searchParams.get('barberId');
-    const date = searchParams.get('date');
 
-    // --- SCENARIO A: Get User History (For Profile Page) ---
-    if (userId) {
-      const history = await Booking.find({ user: userId })
-        .populate('barber', 'shopName location shopImage') // Get Shop Details
-        .sort({ startTime: -1 }); // Newest first
+  const currdate=new Date();
+  const uptodate=new Date();
+  uptodate.setDate(currdate.getDate()+7);
+  uptodate.setTime(uptodate.getTime()+17*60*60*1000)
 
-      return NextResponse.json({ data: history }, { status: 200 });
-    }
+  const upcomingBookings=await Booking.find(
+    {ID:barber_id,
+     starttime:
+               {
+                     $gte:currdate,
+                     $lte:uptodate
+     }
+    });
 
-    // --- SCENARIO B: Calculate Free Slots (For Booking Page) ---
-    if (barberId && date) {
-      const busySlots = await getBusySlots(barberId, date);
-      
-      // Define Work Day: 9:00 AM to 5:00 PM
-      let cursor = new Date(`${date}T09:00:00.000Z`); 
-      const endCursor = new Date(`${date}T17:00:00.000Z`);
-      const freeSlots = [];
-
-      while (cursor < endCursor) {
-        const slotStart = new Date(cursor);
-        const slotEnd = new Date(cursor.getTime() + 30 * 60000); // +30 mins
-        let isConflict = false;
-
-        for (let booking of busySlots) {
-          const bookingStart = new Date(booking.startTime);
-          const bookingEnd = new Date(booking.endTime);
-          // Overlap Check: slotStart < bookingEnd AND slotEnd > bookingStart
-          if (slotStart < bookingEnd && slotEnd > bookingStart) {
-            isConflict = true;
-            break;
-          }
-        }
-
-        // Return ISO Strings (Frontend expects strings)
-        if (!isConflict) {
-          freeSlots.push(slotStart.toISOString());
-        }
-        cursor.setTime(cursor.getTime() + 30 * 60 * 1000);
+  const slot=[];
+  const cursor=new Date(currdate.getDate());
+  while(cursor<=uptodate){
+    const stime=new Date(cursor);
+    const etime=new Date(cursor+30*60*1000);
+    let isconflict=false;
+    for(let upcomingBooking of upcomingBookings){
+      const curr=upcomingBooking.starttime;
+      const ncurr=upcomingBooking.endtime;
+      if(curr<etime&&ncurr>stime){
+        isconflict=true;
+        break;
       }
-      return NextResponse.json({ data: freeSlots }, { status: 200 });
     }
+    if(!isconflict){
+      slot.push({stime,etime});
+    }
+    cursor=cursor.setTime(cursor.getTime()+30*60*1000);
+    if(cursor.getTime()>17){
+      cursor.setDate(cursor.getDate()+1);
+      cursor.setTime('09.00.00.000')
+    }
+  }
+  
+   return NextResponse.json({
+      data:slot
+    },{status:200})
+  
+}
+catch(err){
+ return NextResponse.json({
+    msg:"database load nhi ho rh"
+  })
+}}
 
-    return NextResponse.json({ error: "Missing parameters" }, { status: 400 });
+export async function POST(request){
+  try{
+    
+  await dbConnect();
+  const {body}=request.json();
+  const stime=body.starttime;
+  const etime=body.endtime;
+  const barber=body.barber;
+  const user=body.user;
 
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  const check=Booking.find({
+    barber:barber,
+    starttime:{
+      $lte:etime,
+      $gte:stime
+    }
+  })
+  if(check){
+    return NextResponse.json({
+      msg:"slot already  committed"
+    },{
+      status:200
+    })
+  }
+  Booking.create({
+    barber:barber,
+    user:user,
+    starttime:stime,
+    endtime:etime
+  })
+  return NextResponse.json({
+    msg:"Booking confirmed"
+  },{
+    status:success
+  })}
+  catch(err){
+    return NextResponse.json({
+      "error":err
+    })
   }
 }

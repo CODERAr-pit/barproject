@@ -52,7 +52,6 @@ export default function BarberEditPage() {
           lastName: barber.lastName,
           phone: barber.phone,
           shopName: barber.shopName,
-          location: barber.location,
           // Handle services array cleaning
           services: Array.isArray(barber.services) ? barber.services : [], 
           shopImage: barber.shopImage,
@@ -112,11 +111,7 @@ export default function BarberEditPage() {
             value={barber.shopName || ""} onChange={(e) => updateField("shopName", e.target.value)} />
         </label>
         
-        <label className="block">
-          <span className="text-sm font-medium text-gray-700">Location</span>
-          <input className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500" 
-            value={barber.location || ""} onChange={(e) => updateField("location", e.target.value)} />
-        </label>
+
         
         <label className="block">
           <span className="text-sm font-medium text-gray-700">Services (comma separated)</span>

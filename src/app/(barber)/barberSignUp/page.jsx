@@ -10,7 +10,6 @@ export default function BarberSignup() {
     phone: "",
     password: "",
     shopName: "",
-    location: "",
     services: [],
     shopImage: null, // optional
     barberImage: null, // optional
@@ -25,7 +24,7 @@ export default function BarberSignup() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
-  const [suggestions, setSuggestions] = useState([]);
+  // suggestions removed since location field no longer exists
 
   const servicesList = [
     "Haircut",
@@ -64,6 +63,16 @@ export default function BarberSignup() {
     setError("");
 
     try {
+      // get coords first (returns Promise)
+      const getCoords = () =>
+        new Promise((resolve, reject) =>
+          navigator.geolocation.getCurrentPosition(resolve, reject)
+        );
+
+      const coords = await getCoords();
+      const lat = coords.coords.latitude;
+      const lng = coords.coords.longitude;
+
       const body = new FormData();
       Object.keys(formData).forEach((key) => {
         if (formData[key]) {
@@ -74,6 +83,11 @@ export default function BarberSignup() {
           }
         }
       });
+
+      // no text location field – we rely solely on lat/lng
+
+      body.append("lat", lat);
+      body.append("lng", lng);
 
       const res = await fetch("/api/barbershop", {
         method: "POST",
@@ -98,40 +112,7 @@ export default function BarberSignup() {
     }
   };
 
-  const handleInput = async (e) => {
-    const value = e.target.value;
-    setFormData({ ...formData, location: value });
-
-    if (value.trim() === "") {
-      setSuggestions([]);
-      return;
-    }
-
-    try {
-      const res = await fetch(
-        `https://wft-geo-db.p.rapidapi.com/v1/geo/cities?namePrefix=${value}&limit=5&countryIds=IN`,
-        {
-          headers: {
-            "X-RapidAPI-Key": process.env.NEXT_PUBLIC_RAPIDAPI_KEY,
-            "X-RapidAPI-Host": "wft-geo-db.p.rapidapi.com",
-          },
-        }
-      );
-
-      const data = await res.json();
-      if (data && data.data) {
-        const unique = Array.from(
-          new Set(data.data.map((c) => `${c.city}, ${c.country}`))
-        );
-        setSuggestions(unique);
-      } else {
-        setSuggestions([]);
-      }
-    } catch (error) {
-      console.error("Error fetching cities:", error);
-      setSuggestions([]);
-    }
-  };
+  // location autocomplete removed – no longer collecting city names
 
   return (
     <div className="flex justify-center items-center min-h-screen bg-gray-100">
@@ -211,33 +192,6 @@ export default function BarberSignup() {
           className="w-full mb-3 p-2 border rounded"
           required
         />
-
-        <input
-          type="text"
-          name="location"
-          placeholder="District"
-          value={formData.location}
-          onChange={handleInput}
-          className="w-full mb-3 p-2 border rounded"
-          required
-        />
-
-        {suggestions.length > 0 && (
-          <ul className="absolute left-0 w-[450px] bg-white shadow-lg rounded-lg text-black z-10">
-            {suggestions.map((c) => (
-              <li
-                key={c}
-                onClick={() => {
-                  setFormData({ ...formData, location: c });
-                  setSuggestions([]);
-                }}
-                className="px-4 py-2 cursor-pointer hover:bg-gray-200"
-              >
-                {c}
-              </li>
-            ))}
-          </ul>
-        )}
 
         {/* Services */}
         <label className="block mb-2 font-medium">Services Offered</label>

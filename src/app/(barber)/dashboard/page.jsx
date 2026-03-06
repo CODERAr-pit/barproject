@@ -166,7 +166,6 @@ export default function BarberDashboard() {
             {/* --- Shop Information Card --- */}
             <InfoCard title="Shop Information">
               <InfoItem label="Shop Name" value={barber.shopName} />
-              <InfoItem icon={MapPin} label="Location" value={barber.location} />
               {/* Aligned Services List */}
               <div className="flex gap-4">
                 <div className="flex-shrink-0 w-6" /> {/* Spacer */}

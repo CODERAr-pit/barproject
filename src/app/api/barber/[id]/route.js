@@ -21,7 +21,7 @@ export async function PATCH(req, { params }) {
     const { id } = params;
     const body = await req.json();
     // Allow editing safe fields only
-    const allowed = ["firstName","lastName","phone","shopName","location","services","shopImage","barberImage","isAvailable","nextAvailableAt"];
+    const allowed = ["firstName","lastName","phone","shopName","services","shopImage","barberImage","isAvailable","nextAvailableAt"];
     const update = {};
     for (const key of allowed) {
       if (key in body) update[key] = body[key];

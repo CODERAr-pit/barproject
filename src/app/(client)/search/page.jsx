@@ -1,60 +1,52 @@
 "use client";
 import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import BarberCard from "@/components/BarberCard";
 
 function SearchPageContent() {
-  const searchParams = useSearchParams();
-  const city = searchParams.get("city");
   const [barbers, setBarbers] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!city) {
-      setError("No city specified");
-      return;
-    }
-
-    const fetchBarbers = async () => {
+    const fetchNearby = async () => {
       setLoading(true);
       setError("");
-      
       try {
-        const res = await fetch("/api/search", {
+        const pos = await new Promise((res, rej) =>
+          navigator.geolocation.getCurrentPosition(res, rej)
+        );
+        const { latitude: lat, longitude: lng } = pos.coords;
+
+        const res = await fetch("/api/live_location_barber", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ city }),
+          body: JSON.stringify({ lat, lng }),
         });
-
         const data = await res.json();
-        
         if (res.ok) {
           setBarbers(data.data || []);
-          if (data.count === 0) {
-            setError(`No barbers found in ${city}`);
+          if (!data.data || data.data.length === 0) {
+            setError("No barbers found nearby");
           }
         } else {
-          setError(data.error || "Failed to search barbers");
-          setBarbers([]);
+          setError(data.error || "Failed to fetch nearby barbers");
         }
-      } catch (err) {
-        console.error("Error fetching barbers:", err);
-        setError("Network error. Please try again.");
-        setBarbers([]);
+      } catch (e) {
+        console.error(e);
+        setError("Location access denied or network error");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchBarbers();
-  }, [city]);
+    fetchNearby();
+  }, []);
 
   if (loading) {
     return (
       <div className="p-6">
         <h1 className="text-2xl font-bold mb-4 text-white">
-          Searching barbers in <span className="text-blue-400">{city}</span>
+          Finding barbers near you...
         </h1>
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
@@ -66,19 +58,14 @@ function SearchPageContent() {
 
   if (error) {
     return (
-      <div className="p-6">
-        <h1 className="text-2xl font-bold mb-4 text-white">
-          Search Results for <span className="text-red-400">{city}</span>
-        </h1>
-        <div className="text-center py-12">
-          <div className="text-red-400 text-lg mb-4">⚠️ {error}</div>
-          <button 
-            onClick={() => window.history.back()}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg"
-          >
-            Go Back
-          </button>
-        </div>
+      <div className="p-6 text-center">
+        <div className="text-red-400 text-lg mb-4">⚠️ {error}</div>
+        <button
+          onClick={() => window.history.back()}
+          className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg"
+        >
+          Go Back
+        </button>
       </div>
     );
   }
@@ -87,10 +74,10 @@ function SearchPageContent() {
     <div className="p-6">
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2 text-white">
-          Barbers in <span className="text-blue-400">{city}</span>
+          Nearby Barbers
         </h1>
         <p className="text-gray-300">
-          Found {barbers.length} barber{barbers.length !== 1 ? 's' : ''} in this area
+          Found {barbers.length} barber{barbers.length !== 1 ? 's' : ''} nearby
         </p>
       </div>
 

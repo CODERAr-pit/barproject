@@ -48,10 +48,6 @@ export default function BarberCard({ data }) {
               <div className="text-sm text-green-600">Available now</div>
             )}
 
-            <div className="flex items-center text-gray-600 mb-2">
-              <span className="text-sm">📍</span>
-              <span className="ml-1 text-sm">{barber.location}</span>
-            </div>
 
             <div className="flex items-center text-gray-600 mb-2">
               <span className="text-sm">📞</span>

@@ -18,14 +18,15 @@ export async function POST(req) {
     const phone = formData.get('phone');
     const password = formData.get('password');
     const shopName = formData.get('shopName');
-    const location = formData.get('location');
     const services = JSON.parse(formData.get('services') || '[]');
     const aadharNumber = formData.get('aadharNumber');
     const dob = formData.get('dob');
     const gender = formData.get('gender');
+    const lat=formData.get('lat');
+    const lng=formData.get('lng');
     
     // Validate required fields
-    if (!firstName || !lastName || !email || !phone || !password || !shopName || !location || !aadharNumber || !dob || !gender) {
+    if (!firstName || !lastName || !email || !phone || !password || !shopName ||  !aadharNumber || !dob || !gender) {
       return NextResponse.json(
         { error: "All required fields must be filled" },
         { status: 400 }
@@ -52,15 +53,15 @@ export async function POST(req) {
       phone,
       password: hashedPassword,
       shopName,
-      location,
       services,
       aadharNumber,
       dob: new Date(dob),
       gender,
-      // Handle file uploads if needed
       aadharFront: formData.get('aadharFront')?.name || null,
       aadharBack: formData.get('aadharBack')?.name || null,
       selfieWithAadhar: formData.get('selfieWithAadhar')?.name || null,
+      lat,
+      lng
     });
 
     // Remove password from response

@@ -32,10 +32,6 @@ const BarberSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
-  location: {
-    type: String,
-    required: true,
-  },
   services: {
     type: [String],
     default: [],
@@ -51,7 +47,7 @@ const BarberSchema = new mongoose.Schema({
   aadharNumber: {
     type: String,
     required: true,
-    match: /^\d{12}$/,
+    trim: true,
   },
   dob: {
     type: Date,
@@ -77,6 +73,14 @@ const BarberSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now,
+  },
+    lat: {
+    type: Number,
+    required: true,    // <<–– important
+  },
+  lng: {
+    type: Number,
+    required: true,    // <<–– important
   },
   upvote: {
     type: Number,

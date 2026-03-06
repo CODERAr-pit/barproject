@@ -103,7 +103,6 @@ export default function BarberDetailPage() {
         </div>
         <div className="flex-1">
           <h1 className="text-4xl font-bold text-white mb-2">{barber.shopName}</h1>
-          <p className="text-gray-400 mb-1">{barber.location}</p>
           <p className="text-gray-400 text-sm">Owner: {barber.firstName} {barber.lastName}</p>
           
           <div className="mt-4">

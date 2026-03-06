@@ -27,7 +27,7 @@ export async function GET(request) {
     // --- SCENARIO A: Get Customer History (For User Profile) ---
     if (userId) {
       const history = await Booking.find({ user: userId })
-        .populate('barber', 'shopName location shopImage')
+        .populate('barber', 'shopName shopImage')
         .sort({ startTime: -1 });
       return NextResponse.json({ data: history }, { status: 200 });
     }

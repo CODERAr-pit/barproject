@@ -219,7 +219,6 @@ export default function BarberDashboard() {
 
             <InfoCard title="Shop Information">
               <InfoItem label="Shop Name" value={barber.shopName} />
-              <InfoItem icon={MapPin} label="Location" value={barber.location} />
               <div className="flex gap-4">
                 <div className="flex-shrink-0 w-6" />
                 <div className="flex-1">
