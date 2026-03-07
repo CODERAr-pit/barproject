@@ -47,7 +47,7 @@ const BarberSchema = new mongoose.Schema({
   aadharNumber: {
     type: String,
     required: true,
-    trim: true,
+    match: /^\d{12}$/,       
   },
   dob: {
     type: Date,

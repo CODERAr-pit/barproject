@@ -4,128 +4,78 @@ import { NextResponse } from "next/server";
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 export async function POST(request) {
-  console.log("Received request at /api/groq");
-  const requestBody = await request.json();
-  console.log("Request body:", requestBody);
-  const completion = await getGroqChatCompletion(requestBody);
+  try {
+    const { lat, lng, query } = await request.json();
 
-  const content = completion.choices[0].message.content;
-  const chatCompletion = JSON.parse(content);
+    if (!query) {
+      return new NextResponse("Query is required", { status: 400 });
+    }
 
-  if (chatCompletion.action === "live_location_barber") {
+    // PHASE 1: Routing (Needs strict JSON)
+    const routingPrompt = `You are a routing assistant. 
+    If the user asks for nearby barbers or services based on location, respond ONLY with this JSON: { "action": "live_location_barber" }
+    Otherwise, respond ONLY with this JSON: { "action": "noaction", "response": "Your friendly reply here about the intended question" }
+    Do not include markdown or explanations. ONLY valid JSON.`;
 
-    const res = await fetch(`${process.env.BASE_URL}/api/live_location_barber`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        lat: requestBody.lat,
-        lng: requestBody.lng
-      })
-    });
+    const completion = await getGroqChatCompletion(query, routingPrompt);
+    const content = completion.choices[0].message.content;
 
-    if (res.ok) {
+    let chatCompletion;
+    try {
+      chatCompletion = JSON.parse(content);
+    } catch {
+      return new NextResponse("LLM returned non-JSON response during routing", { status: 502 });
+    }
+
+    // PHASE 2: Fetch and Summarize (Needs Plain Text)
+    if (chatCompletion.action === "live_location_barber") {
+      const res = await fetch(`${process.env.BASE_URL}/api/live_location_barber`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lng, lat }),
+      });
+
+      if (!res.ok) {
+        return new NextResponse("Sorry, I couldn't find any barbers in your location right now.");
+      }
 
       const data = await res.json();
+      
+      // Tell Llama to summarize the data normally, NO JSON
+      const summaryPrompt = `You are a friendly barber booking assistant. Read the provided barber data and give a short, concise, and friendly summary of the nearby barbers and their distances. Do NOT use JSON. Answer in plain, conversational text.`;
+      
+      const comp = await getGroqChatCompletion(JSON.stringify(data), summaryPrompt);
 
-      const comp = await getGroqChatCompletion({
-        context:"You are a chatbot for a barber booking platform. Based on the nearby barbers data, respond with a user-friendly message listing the barbers and their details. If no barbers are found, respond accordingly.",
-        message: JSON.stringify(data)
+      // Return plain text
+      return new NextResponse(comp.choices[0].message.content, {
+        status: 200,
+        headers: { "Content-Type": "text/plain" },
       });
+    }
 
-      return NextResponse.json({
-        data: comp.choices[0].message.content
+    if (chatCompletion.action === "noaction") {
+      // Return plain text for general chats
+      return new NextResponse(chatCompletion.response, {
+        status: 200,
+        headers: { "Content-Type": "text/plain" },
       });
     }
 
-    return NextResponse.json({
-      msg: "No barbers found in your location"
-    });
-  }
+    return new NextResponse("Unrecognised action from LLM", { status: 400 });
 
-  else if (chatCompletion.action === "book_slot") {
-
-    const bookingRes = await fetch(`${process.env.BASE_URL}/api/bookfetch`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        barber: chatCompletion.barber_id,
-        user: chatCompletion.user_id,
-        start_time: chatCompletion.start_time,
-        end_time: chatCompletion.end_time
-      })
-    });
-
-    if (bookingRes.ok) {
-
-      const data = await bookingRes.json();
-
-      const comp = await getGroqChatCompletion({
-        message: JSON.stringify(data)
-      });
-
-      return NextResponse.json({
-        data: comp.choices[0].message.content,
-        booking_id: data.booking_id
-      });
-    }
-  }
-
-  else if (chatCompletion.action === "noaction") {
-
-    return NextResponse.json({
-      response: chatCompletion.response
-    });
+  } catch (e) {
+    console.error("Error in Groq API route:", e);
+    return new NextResponse("Internal Server Error", { status: 500 });
   }
 }
 
-async function getGroqChatCompletion(requestBody) {
-
+// Updated helper function to accept a dynamic system prompt
+async function getGroqChatCompletion(userContent, systemPrompt) {
   return groq.chat.completions.create({
     messages: [
-      {
-        role: "system",
-        content: `
-You are a chatbot for a barber booking platform.
-
-if you recive barbers name or shop name or location or services then respond with:
-{
-these are the details of the barbershop near the you or the details of the barber you asked for}
-
-If the user asks for nearby barbers or services based on location then respond with:
-return JSON like:
-
-{
- "action":"live_location_barber",
-}
-
-If the user asks for booking a slot with a barber:
-
-{
- "action":"book_slot",
- "barber_id":"id",
- "user_id":"id",
- "start_time":"time",
- "end_time":"time"
-}
-
-Otherwise respond:
-
-{
- "action":"noaction",
- "response":"text"
-}
-
-Always respond ONLY in JSON.
-Never include explanations.
-`
-      },
-      {
-        role: "user",
-        content: requestBody.query
-      }
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userContent },
     ],
-    model: "openai/gpt-oss-20b"
+    model: "llama-3.1-8b-instant",
   });
 }
