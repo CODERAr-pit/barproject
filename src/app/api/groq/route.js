@@ -28,6 +28,7 @@ export async function POST(request) {
     }
 
     // PHASE 2: Fetch and Summarize (Needs Plain Text)
+    // PHASE 2: Fetch and Summarize (Needs Plain Text)
     if (chatCompletion.action === "live_location_barber") {
       const res = await fetch(`${process.env.BASE_URL}/api/live_location_barber`, {
         method: "POST",
@@ -39,26 +40,27 @@ export async function POST(request) {
         return new NextResponse("Sorry, I couldn't find any barbers in your location right now.");
       }
 
-      const data = await res.json();
+      // 'data' will look like: { data: [ { name: "Arpit's Cuts", distance: "2.12 km" }, ... ] }
+      const data = await res.json(); 
       
-      // Tell Llama to summarize the data normally, NO JSON
-      const summaryPrompt = `You are a friendly barber booking assistant. Read the provided barber data and give a short, concise, and friendly summary of the nearby barbers and their distances. Do NOT use JSON. Answer in plain, conversational text.`;
-      
-      const comp = await getGroqChatCompletion(JSON.stringify(data), summaryPrompt);
-
-      // Return plain text
-      return new NextResponse(comp.choices[0].message.content, {
-        status: 200,
-        headers: { "Content-Type": "text/plain" },
-      });
+      return NextResponse.json(
+        {
+          response: "I found these barbers near your location! Click one to see their slots.", // AI text bubble
+          uiType: "barber_ui", // Tells UI to render the boxes
+          payload: data.data   // Passes the array of barbers to the UI!
+        },
+        { status: 200 }
+      );
     }
 
     if (chatCompletion.action === "noaction") {
-      // Return plain text for general chats
-      return new NextResponse(chatCompletion.response, {
-        status: 200,
-        headers: { "Content-Type": "text/plain" },
-      });
+      return NextResponse.json(
+    {
+      response: chatCompletion.response, // The text the AI wants to say
+      uiType: "Simple"                   // The flag to trigger your UI boxes
+  }, 
+  { status: 200 }
+);
     }
 
     return new NextResponse("Unrecognised action from LLM", { status: 400 });

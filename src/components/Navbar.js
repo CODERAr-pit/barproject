@@ -42,6 +42,11 @@ const Navbar = () => {
               My Shop
               </Link>
             </li>
+            <li>
+              <Link href="/userhistory" className="hover:text-blue-400 transition-colors">
+              History
+              </Link>
+            </li>
           </ul>
 
           {/* Auth Buttons */}

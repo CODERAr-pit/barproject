@@ -4,6 +4,10 @@ import Barber from '@/models/Barber'
 export async function POST(req) {
     await connectDB()
    try{ const {location}=await req.json();
+    if(!location){
+      const barbers=await Barber.find().sort({rating:-1});
+      return NextResponse.json(barbers);
+    }
     const barbers=await Barber.find({ location: { $regex: location, $options: "i" } }).sort({ rating: -1 }) //regex for not exact match and options for case insensitive
      return NextResponse.json(barbers);//.sort new for me and .limit restrict only top 10 choices
 }
