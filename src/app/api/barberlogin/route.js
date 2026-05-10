@@ -19,14 +19,20 @@ export async function POST(req) {
       );
     }
 
-    const user = await BarberShop.findOne({ email });
+    // Normalize email to lowercase for case-insensitive search
+    const normalizedEmail = email.toLowerCase().trim();
+    console.log("🔍 Searching for barber with email:", normalizedEmail);
+    const user = await BarberShop.findOne({ email: normalizedEmail });
 
     if (!user) {
+      console.error("❌ No barber found with email:", normalizedEmail);
       return NextResponse.json(
         { error: "Shop not found" },
         { status: 404 }
       );
     }
+
+    console.log("✅ Barber found:", user.email);
 
     // Compare password using bcrypt
     const isPasswordValid = await bcrypt.compare(password, user.password);

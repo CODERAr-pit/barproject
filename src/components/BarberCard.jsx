@@ -1,5 +1,8 @@
 "use client";
 import { useRouter } from "next/navigation";
+import Hashids from 'hashids';
+
+const hashids = new Hashids("your_secret_salt", 8);
 
 export default function BarberCard({ data }) {
   const router = useRouter();  // ✅ initialize the router
@@ -16,7 +19,9 @@ export default function BarberCard({ data }) {
   }
 
   const handleAppointment = (id) => {
-    router.push(`/barber/${id}`);
+    // ✅ Encode ID with hashids before routing
+    const encodedId = hashids.encodeHex(id);
+    router.push(`/barber/${encodedId}`);
   };
 
   return (

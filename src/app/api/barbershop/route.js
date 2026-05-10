@@ -18,7 +18,7 @@ export async function POST(req) {
 
     const firstName = formData.get('firstName');
     const lastName = formData.get('lastName');
-    const email = formData.get('email');
+    const email = formData.get('email')?.toLowerCase().trim();
     const phone = formData.get('phone');
     const password = formData.get('password');
     const shopName = formData.get('shopName');
@@ -29,6 +29,8 @@ export async function POST(req) {
     const lat = formData.get('lat');
     const lng = formData.get('lng');
 
+    console.log("📝 Barber signup attempt with email:", email);
+
     if (!firstName || !lastName || !email || !phone || !password || !shopName || !aadharNumber || !dob || !gender || !lat || !lng) {
       return NextResponse.json(
         { error: "All required fields (including location) must be filled" },
@@ -38,6 +40,7 @@ export async function POST(req) {
 
     const existingBarber = await BarberShop.findOne({ email });
     if (existingBarber) {
+      console.warn("⚠️ Barber already exists with email:", email);
       return NextResponse.json(
         { error: "A barber with this email already exists" },
         { status: 400 }
@@ -57,6 +60,8 @@ export async function POST(req) {
       lat: parseFloat(lat),
       lng: parseFloat(lng),
     });
+
+    console.log("✅ Barber registered successfully with ID:", barber._id, "Email:", barber.email);
 
     // geoadd with flat args — same fix as geosearch
     try {

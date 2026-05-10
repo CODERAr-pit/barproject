@@ -52,7 +52,7 @@ export default function BarberSignup() {
         onSubmit={handleSubmit}
         className="bg-slate-600 shadow-lg rounded-2xl p-6 w-96"
       >
-        <h2 className="text-2xl font-bold mb-4 text-center">Barber Shop Signup</h2>
+        <h2 className="text-2xl font-bold mb-4 text-center">Barber Shop Login</h2>
 
         <input
           type="email"
