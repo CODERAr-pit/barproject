@@ -136,6 +136,12 @@ const BarberSchema = new mongoose.Schema({
       end: { type: String, default: "00:00" },
       isOff: { type: Boolean, default: true }, // Default Day Off
     },
+    blockedSlots: [
+  {
+    date: { type: String, required: true }, // e.g., "2026-05-11"
+    slots: [{ type: String }]               // e.g., ["01:00 PM", "01:30 PM"]
+  }
+]
   },
 });
 

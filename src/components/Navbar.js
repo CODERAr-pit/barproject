@@ -28,22 +28,18 @@ const Navbar = () => {
               </Link>
             </li>
             <li>
-              <Link href="/find-barbers" className="hover:text-blue-400 transition-colors">
+              <Link href="/find" className="hover:text-blue-400 transition-colors">
                 Find Barbers
               </Link>
             </li>
-            <li>
-              <Link href="/contact" className="hover:text-blue-400 transition-colors">
-                Contact
-              </Link>
-            </li>
+            
             <li>
               <Link href="/barberLogin" className="hover:text-blue-400 transition-colors">
               My Shop
               </Link>
             </li>
             <li>
-              <Link href="/userhistory" className="hover:text-blue-400 transition-colors">
+              <Link href="/history" className="hover:text-blue-400 transition-colors">
               History
               </Link>
             </li>

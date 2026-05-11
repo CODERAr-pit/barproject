@@ -11,11 +11,22 @@ export default function BarberDetailPage() {
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [slots, setSlots] = useState([]);
   const [selectedSlot, setSelectedSlot] = useState(null); // Will store the Time String
-  const [service, setService] = useState("");
+  const [service, setService] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  // 1. Load Barber Details
+  const [time,setTime]=useState();
+ 
+  const serviceDurations = {
+  "Haircut": 30,
+  "Spa": 60,
+  "Beardset": 20,
+  "Hairwash": 15,
+  "Facewash": 15,
+  "Men": 0,
+  "Women": 0,
+  "Children (18-)": 0
+};
+ // 1. Load Barber Details
   useEffect(() => {
     const load = async () => {
       try {
@@ -33,6 +44,21 @@ export default function BarberDetailPage() {
   }, [id]);
 
   // 2. Fetch Available Slots
+  const [selectedServices, setSelectedServices] = useState([]);
+
+  const handleChange = (e, item) => {
+    const isChecked = e.target.checked;
+
+    if (isChecked) {
+      setSelectedServices((prev) => [...prev, item]);
+    } else {
+      setSelectedServices((prev) => prev.filter((service) => service !== item));
+    }
+  }
+  const totalTime = selectedServices.reduce((total, service) => {
+    return total + (serviceDurations[service] || 0);
+  }, 0);
+
   const fetchSlots = async () => {
     if (!barber?._id || !date) return;
     
@@ -50,29 +76,26 @@ export default function BarberDetailPage() {
 
   useEffect(() => { fetchSlots(); }, [barber?._id, date]);
 
-  // 3. Handle Booking
   const handleBook = async () => {
     try {
       if (!selectedSlot || !service) return alert("Select slot and service");
 
-      // ✅ Get User ID from NextAuth session
       const userId = session?.user?.id;
       if (!userId) return alert("Please log in to book");
 
-      // ✅ Calculate End Time (Start + 30 mins)
       const startDate = new Date(selectedSlot);
-      const endDate = new Date(startDate.getTime() + 30 * 60000);
+      const endDate = new Date(startDate.getTime() + totalTime * 60000);
 
       const res = await fetch("/api/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-            user: userId,          // Matches your POST API (user, not userId)
-            barber: barber._id,    // Matches your POST API (barber, not barberId)
+            user: userId,         
+            barber: barber._id,    
             date: date,
-            start: startDate,      // Matches your POST API logic
+            start: startDate,      
             end: endDate,
-            service: service 
+            serviceType: selectedServices 
         }),
       });
 
@@ -140,18 +163,31 @@ export default function BarberDetailPage() {
             />
           </div>
           <div className="w-full sm:w-auto flex-1">
-            <label className="block text-xs font-medium text-gray-400 mb-1">Select Service</label>
-            <select 
-                value={service} 
-                onChange={(e) => setService(e.target.value)} 
-                className="w-full bg-gray-900 border border-gray-600 text-white rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-            >
-              <option value="">Select a service</option>
-              {barber.services?.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-          </div>
+      <label className="block text-xs font-medium text-gray-400 mb-1">
+        Select Service
+      </label>
+
+      <div className="mb-3 text-sm text-green-500 font-semibold">
+        Estimated Time: {totalTime} mins
+      </div>
+
+      <div className="flex flex-col gap-2">
+        {barber.services?.map((s, index) => (
+          <label key={index} className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              onChange={(e) => handleChange(e, s)}
+              // Ensure the checkbox UI matches the state
+              checked={selectedServices.includes(s)}
+              className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+            />
+            <span className="text-sm">
+              {s} {serviceDurations[s] > 0 && `(${serviceDurations[s]} mins)`}
+            </span>
+          </label>
+        ))}
+      </div>
+    </div>
           <button 
             onClick={fetchSlots} 
             className="w-full sm:w-auto px-6 py-2 bg-gray-700 hover:bg-gray-600 border border-gray-600 text-white rounded-lg transition-colors font-medium"

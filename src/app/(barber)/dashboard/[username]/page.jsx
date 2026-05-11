@@ -3,15 +3,17 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Mail, Phone, MapPin, Scissors, ThumbsUp, ThumbsDown,
-  Calendar, User, LogOut, Store, Image as ImageIcon,
-  Loader2, Star, Clock 
+  Mail, Phone, Scissors, Calendar, User, 
+  LogOut, Store, Image as ImageIcon,
+  Loader2, Clock, CalendarOff
 } from "lucide-react";
+import Hashids from 'hashids';
 
+const hashids = new Hashids("your_secret_salt", 8);
 // --- Loading Spinner ---
 const LoadingSpinner = () => (
-  <div className="flex justify-center items-center min-h-screen bg-slate-100">
-    <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
+  <div className="flex justify-center items-center min-h-screen bg-slate-950">
+    <Loader2 className="w-10 h-10 text-red-600 animate-spin" />
   </div>
 );
 
@@ -30,23 +32,37 @@ export default function BarberDashboard() {
   const [loading, setLoading] = useState(true);
   const [savingAvail, setSavingAvail] = useState(false);
 
-  // New State for Bookings
+  // Bookings State
   const [bookings, setBookings] = useState([]);
   const [loadingBookings, setLoadingBookings] = useState(false);
+  
+  // NEW: State for filtering bookings by date (defaults to today)
+  const [bookingFilterDate, setBookingFilterDate] = useState(new Date().toISOString().split("T")[0]);
 
-  // Availability State
+  // Global Availability State
   const [isAvailable, setIsAvailable] = useState(true);
   const [nextAvailableAt, setNextAvailableAt] = useState("");
 
-  // ✅ 1. Fetch Bookings Function
+  // Specific Slot Blocking State
+  const [blockDate, setBlockDate] = useState(new Date().toISOString().split("T")[0]);
+  const [blockedTimeSlots, setBlockedTimeSlots] = useState([]);
+  const [savingBlocked, setSavingBlocked] = useState(false);
+
+  // Standard Barber Working Hours
+  const allTimeSlots = [
+    "09:00 AM", "09:30 AM", "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM",
+    "12:00 PM", "12:30 PM", "01:00 PM", "01:30 PM", "02:00 PM", "02:30 PM",
+    "03:00 PM", "03:30 PM", "04:00 PM", "04:30 PM", "05:00 PM", "05:30 PM",
+    "06:00 PM", "06:30 PM", "07:00 PM", "07:30 PM", "08:00 PM"
+  ];
+
+  // Fetch Bookings
   const fetchBookings = async (barberId) => {
     if (!barberId) return;
     setLoadingBookings(true);
     try {
-      // Fetch upcoming bookings (Next 7 days)
       const res = await fetch(`/api/bookings?barberId=${barberId}&scope=upcoming`);
       const data = await res.json();
-
       if (res.ok && data.data) {
         setBookings(Array.isArray(data.data) ? data.data : []);
       }
@@ -57,20 +73,43 @@ export default function BarberDashboard() {
     }
   };
 
-  // ✅ 2. Load Barber & Init
+  // Init
+ // Init & Sync
   useEffect(() => {
     if (typeof window !== "undefined") {
       const storedBarber = localStorage.getItem("barber");
       
       if (storedBarber) {
         const parsedBarber = JSON.parse(storedBarber);
-        setBarber(parsedBarber);
         
+        // 1. Set initial state immediately so the screen doesn't stay blank
+        setBarber(parsedBarber);
         setIsAvailable(parsedBarber.isAvailable ?? true);
         setNextAvailableAt(toLocalISOString(parsedBarber.nextAvailableAt));
-
-        // FETCH BOOKINGS NOW
+        
+        // 2. Fetch bookings
         fetchBookings(parsedBarber._id);
+
+        // 3. ✨ THE FIX: Fetch the fresh profile directly from the Database ✨
+        const syncFreshBarberData = async () => {
+          try {
+            // Note: Adjust this URL if your specific barber fetch route is different
+            const res = await fetch(`/api/barber/${parsedBarber._id}`);
+            const data = await res.json();
+            
+            if (res.ok && data.data) {
+              const freshBarber = data.data;
+              setBarber(freshBarber); // Updates state with the real database blockedSlots!
+              
+              // Keep localStorage updated with the fresh database info
+              localStorage.setItem("barber", JSON.stringify(freshBarber)); 
+            }
+          } catch (err) {
+            console.error("Failed to sync fresh barber data:", err);
+          }
+        };
+
+        syncFreshBarberData();
 
       } else {
         router.push("/login");
@@ -79,11 +118,26 @@ export default function BarberDashboard() {
     }
   }, [router]);
 
+  // NEW: Watch for blockDate changes and update red slots from the database
+  useEffect(() => {
+    if (barber && barber.blockedSlots) {
+      const existingBlock = barber.blockedSlots.find(bs => bs.date === blockDate);
+      if (existingBlock) {
+        setBlockedTimeSlots(existingBlock.slots || []);
+      } else {
+        setBlockedTimeSlots([]); // clear if no slots are blocked on this new date
+      }
+    } else {
+      setBlockedTimeSlots([]);
+    }
+  }, [blockDate, barber]);
+
   const handleLogout = () => {
     localStorage.removeItem("barber");
     router.push("/login");
   };
 
+  // Save Global Availability
   const saveAvailability = async () => {
     if (!barber?._id) return;
     try {
@@ -107,8 +161,7 @@ export default function BarberDashboard() {
       setIsAvailable(updatedBarber.isAvailable ?? true);
       setNextAvailableAt(toLocalISOString(updatedBarber.nextAvailableAt));
       
-      alert("Availability updated!");
-      
+      alert("Shop status updated!");
     } catch (e) {
       alert(e.message);
     } finally {
@@ -116,122 +169,178 @@ export default function BarberDashboard() {
     }
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return "—";
-    return new Date(dateString).toLocaleDateString("en-IN", {
-      year: "numeric", month: "long", day: "numeric",
-    });
+  // Toggle Specific Slot Checkbox Logic
+  const handleSlotToggle = (slot) => {
+    if (blockedTimeSlots.includes(slot)) {
+      setBlockedTimeSlots(prev => prev.filter(s => s !== slot));
+    } else {
+      setBlockedTimeSlots(prev => [...prev, slot]);
+    }
+  };
+
+  // Save Blocked Slots to Backend
+  const saveBlockedSlots = async () => {
+    if (!barber?._id) return;
+    
+    try {
+      setSavingBlocked(true);
+      
+      const res = await fetch(`/api/blockslots/${barber._id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: blockDate, 
+          slots: blockedTimeSlots
+        }),
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to save blocked slots.");
+      }
+      
+      alert(`Success: Slots updated for ${blockDate}`);
+      
+      // Update local barber state so it remembers without reloading!
+      const updatedBarber = { ...barber };
+      if (!updatedBarber.blockedSlots) updatedBarber.blockedSlots = [];
+      
+      const dateIndex = updatedBarber.blockedSlots.findIndex(bs => bs.date === blockDate);
+      if (dateIndex > -1) {
+        updatedBarber.blockedSlots[dateIndex].slots = blockedTimeSlots;
+      } else {
+        updatedBarber.blockedSlots.push({ date: blockDate, slots: blockedTimeSlots });
+      }
+      
+      setBarber(updatedBarber);
+      localStorage.setItem("barber", JSON.stringify(updatedBarber));
+      
+      // Notice we DO NOT clear setBlockedTimeSlots([]) anymore so they stay red!
+      
+    } catch (error) {
+      console.error(error);
+      alert(error.message);
+    } finally {
+      setSavingBlocked(false);
+    }
   };
 
   if (loading) return <LoadingSpinner />;
   if (!barber) return null;
 
-  const rating = barber.upvote + barber.downvote > 0
-      ? ((barber.upvote / (barber.upvote + barber.downvote)) * 100).toFixed(0)
-      : "0";
+  // Filter bookings to only show the selected date
+  const filteredBookings = bookings.filter((booking) => {
+    const bookingDateStr = new Date(booking.startTime).toISOString().split("T")[0];
+    return bookingDateStr === bookingFilterDate;
+  });
 
   return (
-    <div className="min-h-screen bg-slate-100 text-gray-800">
-      <header className="bg-white shadow-md sticky top-0 z-20">
+    <div className="min-h-screen bg-slate-950 text-slate-200">
+      
+      {/* Top Header */}
+      <header className="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="bg-indigo-600 p-3 rounded-xl shadow-sm">
+            <div className="bg-red-600 p-3 rounded-xl shadow-sm shadow-red-500/20">
               <Scissors className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-              <p className="text-sm text-gray-500">Welcome, {barber.firstName}!</p>
+              <h1 className="text-xl font-bold text-white">{barber.shopName || "My Shop"}</h1>
+              <p className="text-sm text-slate-400">Welcome back, {barber.firstName}</p>
             </div>
           </div>
-          <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 bg-red-100 hover:bg-red-200 rounded-lg transition-colors">
-            <LogOut className="w-4 h-4" /> <span>Logout</span>
+          <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-500 bg-red-500/10 hover:bg-red-500/20 rounded-lg transition-colors border border-red-500/20">
+            <LogOut className="w-4 h-4" /> <span className="hidden sm:inline">Logout</span>
           </button>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <StatCard icon={ThumbsUp} title="Total Upvotes" value={barber.upvote || 0} color="green" />
-          <StatCard icon={ThumbsDown} title="Total Downvotes" value={barber.downvote || 0} color="red" />
-          <StatCard icon={Star} title="Approval Rating" value={`${rating}%`} color="indigo" />
-        </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          
           {/* Left Column */}
           <div className="lg:col-span-2 space-y-8">
             
-            {/* --- NEW: BOOKINGS SECTION (FIXED) --- */}
-            <div className="bg-white rounded-2xl shadow-xl border p-6 sm:p-8">
-                <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200">
-                    <h3 className="text-2xl font-bold text-gray-900">Upcoming Appointments</h3>
-                    <button onClick={() => fetchBookings(barber._id)} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">Refresh</button>
+            {/* Bookings Section */}
+            <div className="bg-slate-900 rounded-2xl shadow-xl border border-slate-800 p-6 sm:p-8">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6 pb-4 border-b border-slate-800">
+                    <h3 className="text-2xl font-bold text-white">Appointments</h3>
+                    
+                    {/* NEW: Datewise filter controls */}
+                    <div className="flex items-center gap-3">
+                      <input 
+                        type="date" 
+                        value={bookingFilterDate}
+                        onChange={(e) => setBookingFilterDate(e.target.value)}
+                        className="bg-slate-800 border-slate-700 text-white rounded-lg shadow-sm focus:ring-2 focus:ring-red-500 p-2 text-sm"
+                      />
+                      <button onClick={() => fetchBookings(barber._id)} className="text-sm text-red-500 hover:text-red-400 font-medium transition-colors border border-red-500/30 px-3 py-2 rounded-lg bg-red-500/10">
+                        Refresh
+                      </button>
+                    </div>
                 </div>
                 
                 {loadingBookings ? (
-                    <div className="flex justify-center py-8"><Loader2 className="animate-spin text-indigo-600"/></div>
-                ) : bookings.length > 0 ? (
+                    <div className="flex justify-center py-8"><Loader2 className="animate-spin text-red-500"/></div>
+                ) : filteredBookings.length > 0 ? (
                     <div className="space-y-3">
-                        {bookings.map((booking, index) => (
-                            <div key={index} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
-                                <div className="flex items-center gap-4">
-                                    <div className="bg-indigo-100 p-2 rounded-lg text-indigo-600">
-                                        <Clock className="w-5 h-5" />
+                        {filteredBookings.map((booking, index) => (
+                            <div key={index} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-slate-600 transition-colors gap-4">
+                                <div className="flex items-start sm:items-center gap-4">
+                                    <div className="bg-slate-800 p-3 rounded-xl border border-slate-700 text-slate-400 shrink-0">
+                                        <Clock className="w-6 h-6 text-red-500" />
                                     </div>
                                     <div>
-                                        {/* ✅ FIX 1: Display Date & Time correctly from 'startTime' */}
-                                        <p className="font-bold text-gray-900">
-                                            {new Date(booking.startTime).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                                            {" at "}
+                                        <p className="font-bold text-white text-lg">
                                             {new Date(booking.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </p>
-                                        
-                                        {/* ✅ FIX 2: Display Customer Name (if populated) */}
-                                        <p className="text-sm font-semibold text-gray-700">
+                                        <p className="text-md font-semibold text-slate-200 mt-1">
                                             {booking.user?.firstName 
                                                 ? `${booking.user.firstName} ${booking.user.lastName || ''}` 
-                                                : "Unknown Customer"}
+                                                : "Walk-in / Unknown"}
                                         </p>
-
-                                        {/* ✅ FIX 3: Display Service Name */}
-                                        <p className="text-xs text-gray-500">
-                                            {booking.serviceType || booking.service || "Standard Service"}
+                                        <p className="text-sm text-slate-400 mt-0.5">
+                                            {Array.isArray(booking.serviceType) ? booking.serviceType.join(", ") : (booking.serviceType || booking.service || "Standard Cut")}
                                         </p>
                                     </div>
                                 </div>
-                                <div className="text-right">
-                                     <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-bold">Confirmed</span>
+                                <div className="sm:text-right flex sm:flex-col items-center sm:items-end justify-between">
+                                     <span className="px-3 py-1 bg-green-500/10 text-green-400 border border-green-500/20 text-xs rounded-full font-bold uppercase tracking-wider">
+                                       Confirmed
+                                     </span>
                                 </div>
                             </div>
                         ))}
                     </div>
                 ) : (
-                    <div className="text-center py-10 text-gray-400">
-                        No bookings found for the next 7 days.
+                    <div className="text-center py-12 bg-slate-800/20 rounded-xl border border-slate-800 text-slate-500">
+                        <Calendar className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                        <p>Your chair is empty.</p>
+                        <p className="text-sm mt-1">No bookings scheduled for this date.</p>
                     </div>
                 )}
             </div>
 
-            <InfoCard title="Personal Information">
-              <InfoItem label="Full Name" value={`${barber.firstName} ${barber.lastName}`} />
-              <InfoItem icon={Mail} label="Email" value={barber.email} />
-              <InfoItem icon={Phone} label="Phone" value={barber.phone} />
-            </InfoCard>
-
-            <InfoCard title="Shop Information">
-              <InfoItem label="Shop Name" value={barber.shopName} />
-              <div className="flex gap-4">
-                <div className="flex-shrink-0 w-6" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-500 mb-2">Services Offered</p>
+            {/* Shop & Personal Info */}
+            <InfoCard title="Profile & Shop Details">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <InfoItem icon={User} label="Owner" value={`${barber.firstName} ${barber.lastName}`} />
+                  <InfoItem icon={Mail} label="Email" value={barber.email} />
+                  <InfoItem icon={Phone} label="Phone" value={barber.phone} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-400 mb-3">Services Offered</p>
                   <div className="flex flex-wrap gap-2">
                     {barber.services?.length > 0 ? (
                         barber.services.map((service) => (
-                        <span key={service} className="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-sm font-medium">
+                        <span key={service} className="px-3 py-1 bg-slate-800 border border-slate-700 text-slate-300 rounded-full text-xs font-medium">
                             {service}
                         </span>
                         ))
                     ) : (
-                        <p className="text-gray-500 italic">No services listed yet.</p>
+                        <p className="text-slate-500 text-sm italic">No services listed yet.</p>
                     )}
                   </div>
                 </div>
@@ -239,10 +348,10 @@ export default function BarberDashboard() {
             </InfoCard>
           </div>
 
-          {/* Right Column */}
+          {/* Right Column (Controls & Images) */}
           <div className="space-y-8">
-            <ImageCard title="Profile Photo" icon={User} src={barber.barberImage} />
-            <ImageCard title="Shop Photo" icon={Store} src={barber.shopImage} />
+            
+            {/* Global Availability Control */}
             <AvailabilityCard
               isAvailable={isAvailable}
               onToggle={setIsAvailable}
@@ -251,63 +360,168 @@ export default function BarberDashboard() {
               onSave={saveAvailability}
               savingAvail={savingAvail}
             />
+
+            {/* Block Specific Slots Control */}
+            <div className="bg-slate-900 rounded-2xl shadow-xl border border-slate-800 p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <CalendarOff className="w-5 h-5 text-red-500" />
+                <h3 className="text-lg font-bold text-white">Block Specific Times</h3>
+              </div>
+              <p className="text-xs text-slate-400 mb-4">
+                Select a date to view or modify your blocked lunch breaks and errands.
+              </p>
+
+              {/* Date Selector */}
+              <div className="mb-4">
+                <input 
+                  type="date" 
+                  value={blockDate}
+                  onChange={(e) => setBlockDate(e.target.value)}
+                  className="w-full bg-slate-800 border-slate-700 text-white rounded-lg shadow-sm focus:ring-2 focus:ring-red-500 p-2 text-sm"
+                />
+              </div>
+
+              {/* Time Slots Grid */}
+              <div className="h-48 overflow-y-auto pr-2 mb-4 space-y-2 custom-scrollbar">
+                <div className="grid grid-cols-3 gap-2">
+                  {allTimeSlots.map((slot) => {
+                    const isBlocked = blockedTimeSlots.includes(slot);
+                    return (
+                      <button
+                        key={slot}
+                        onClick={() => handleSlotToggle(slot)}
+                        className={`py-2 text-xs font-medium rounded-lg border transition-all ${
+                          isBlocked 
+                            ? "bg-red-500/10 text-red-400 border-red-500/50 shadow-[inset_0_0_8px_rgba(239,68,68,0.2)]" 
+                            : "bg-slate-800/50 text-slate-400 border-slate-700 hover:border-slate-500 hover:text-slate-300"
+                        }`}
+                      >
+                        {slot}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <button 
+                onClick={saveBlockedSlots} 
+                disabled={savingBlocked} 
+                className="w-full flex items-center justify-center bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white text-sm font-semibold py-3 px-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {savingBlocked ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save Blocked Slots"}
+              </button>
+            </div>
+            
+            {/* Quick Actions */}
             <ActionsCard />
+
+            {/* Images */}
+            <ImageCard title="Shop Front" icon={Store} src={barber.shopImage} />
           </div>
         </div>
       </main>
+
+      <style dangerouslySetInnerHTML={{__html: `
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
+      `}} />
     </div>
   );
 }
 
 // --- Reusable Components ---
-const StatCard = ({ icon: Icon, title, value, color }) => {
-  const colors = { green: "text-green-600 bg-green-100", red: "text-red-600 bg-red-100", indigo: "text-indigo-600 bg-indigo-100" };
-  return (
-    <div className="bg-white rounded-2xl shadow-xl border p-6 transform hover:-translate-y-1 transition-transform duration-300">
-      <div className={`p-3 rounded-lg inline-block mb-4 ${colors[color]}`}><Icon className="w-7 h-7" /></div>
-      <p className="text-sm text-gray-500 font-medium">{title}</p>
-      <p className="text-4xl font-bold text-gray-900">{value}</p>
-    </div>
-  );
-};
+
 const InfoCard = ({ title, children }) => (
-  <div className="bg-white rounded-2xl shadow-xl border p-6 sm:p-8">
-    <h3 className="text-2xl font-bold text-gray-900 mb-6 pb-4 border-b border-slate-200">{title}</h3>
-    <div className="space-y-5">{children}</div>
+  <div className="bg-slate-900 rounded-2xl shadow-xl border border-slate-800 p-6 sm:p-8">
+    <h3 className="text-xl font-bold text-white mb-6 pb-4 border-b border-slate-800">{title}</h3>
+    <div>{children}</div>
   </div>
 );
+
 const InfoItem = ({ icon: Icon, label, value }) => (
-  <div className="flex gap-4">
-    <div className="flex-shrink-0 w-6 text-center pt-1">{Icon && <Icon className="w-5 h-5 text-indigo-600 inline-block" />}</div>
-    <div className="flex-1"><p className="text-sm font-medium text-gray-500">{label}</p><p className="text-lg text-gray-900 font-semibold">{value || "—"}</p></div>
-  </div>
-);
-const ImageCard = ({ title, icon: Icon, src }) => (
-  <div className="bg-white rounded-2xl shadow-xl border p-6 transform hover:-translate-y-1 transition-all duration-300">
-    <div className="flex items-center gap-3 mb-4"><Icon className="w-5 h-5 text-indigo-600" /><h3 className="text-lg font-bold text-gray-900">{title}</h3></div>
-    {src ? <img src={src} alt={title} className="w-full h-64 object-cover rounded-lg shadow-md" /> : <div className="w-full h-64 bg-slate-50 rounded-lg flex flex-col items-center justify-center border-2 border-dashed border-gray-300"><ImageIcon className="w-12 h-12 text-gray-400 mb-2" /><span className="text-gray-400 text-sm">No image uploaded</span></div>}
-  </div>
-);
-const AvailabilityCard = ({ isAvailable, onToggle, nextAvailableAt, onDateChange, onSave, savingAvail }) => (
-  <div className="bg-white rounded-2xl shadow-xl border p-6 space-y-5 transform hover:-translate-y-1 transition-all duration-300">
-    <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2"><Calendar className="w-5 h-5 text-indigo-600"/> Manage Availability</h3>
-    <div className="flex items-center justify-between bg-slate-50 p-3 rounded-lg"><span className="font-medium text-gray-700">Currently Available</span><ToggleSwitch checked={isAvailable} onChange={onToggle} /></div>
-    <div className={`space-y-2 transition-all duration-300 ${isAvailable ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
-      <label htmlFor="nextAvailableAt" className="block text-sm font-medium text-gray-600">Next Available At</label>
-      <input id="nextAvailableAt" type="datetime-local" value={nextAvailableAt} onChange={onDateChange} disabled={isAvailable} className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-slate-100 p-2 border" />
+  <div className="flex items-center gap-3 mb-4">
+    <div className="flex-shrink-0 bg-slate-800 p-2 rounded-lg border border-slate-700">
+      {Icon && <Icon className="w-4 h-4 text-red-500" />}
     </div>
-    <button onClick={onSave} disabled={savingAvail} className="mt-2 w-full flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-lg shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed">{savingAvail ? <Loader2 className="w-5 h-5 animate-spin" /> : "Save Availability"}</button>
+    <div>
+      <p className="text-xs font-medium text-slate-500">{label}</p>
+      <p className="text-sm text-white font-medium">{value || "—"}</p>
+    </div>
   </div>
 );
+
+const ImageCard = ({ title, icon: Icon, src }) => (
+  <div className="bg-slate-900 rounded-2xl shadow-xl border border-slate-800 p-5">
+    <div className="flex items-center gap-2 mb-3">
+      <Icon className="w-4 h-4 text-slate-400" />
+      <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider">{title}</h3>
+    </div>
+    {src ? (
+      <img src={src} alt={title} className="w-full h-48 object-cover rounded-xl border border-slate-700" />
+    ) : (
+      <div className="w-full h-48 bg-slate-800 rounded-xl flex flex-col items-center justify-center border border-dashed border-slate-700">
+        <ImageIcon className="w-8 h-8 text-slate-600 mb-2" />
+        <span className="text-slate-500 text-xs">No image</span>
+      </div>
+    )}
+  </div>
+);
+
+const AvailabilityCard = ({ isAvailable, onToggle, nextAvailableAt, onDateChange, onSave, savingAvail }) => (
+  <div className="bg-slate-900 rounded-2xl shadow-xl border border-slate-800 p-6 space-y-5">
+    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+      <div className={`w-2.5 h-2.5 rounded-full ${isAvailable ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-500'}`}></div>
+      Status & Availability
+    </h3>
+    <div className="flex items-center justify-between bg-slate-800/50 border border-slate-700 p-4 rounded-xl">
+      <div>
+        <span className="block font-semibold text-slate-200">Accepting Bookings</span>
+        <span className="text-xs text-slate-500">Toggle if you are closing the shop</span>
+      </div>
+      <ToggleSwitch checked={isAvailable} onChange={onToggle} />
+    </div>
+    <div className={`space-y-2 transition-all duration-300 ${isAvailable ? 'opacity-50 pointer-events-none hidden' : 'opacity-100 block'}`}>
+      <label htmlFor="nextAvailableAt" className="block text-xs font-medium text-slate-400">Shop Opening At (Optional)</label>
+      <input 
+        id="nextAvailableAt" 
+        type="datetime-local" 
+        value={nextAvailableAt} 
+        onChange={onDateChange} 
+        disabled={isAvailable} 
+        className="w-full bg-slate-800 border-slate-700 text-white rounded-lg shadow-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 disabled:bg-slate-900 disabled:text-slate-600 p-2.5 border text-sm" 
+      />
+    </div>
+    <button 
+      onClick={onSave} 
+      disabled={savingAvail} 
+      className="mt-2 w-full flex items-center justify-center bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      {savingAvail ? <Loader2 className="w-5 h-5 animate-spin" /> : "Save Status"}
+    </button>
+  </div>
+);
+
 const ActionsCard = () => (
-  <div className="bg-white rounded-2xl shadow-xl border p-6 space-y-4 transform hover:-translate-y-1 transition-all duration-300">
-    <h3 className="text-xl font-bold text-gray-900">Manage Account</h3>
-    <a href="/edit" className="w-full block text-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition-all shadow-md hover:shadow-lg">Edit Profile</a>
-    <button className="w-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-3 px-6 rounded-lg transition-all">Update Shop Details</button>
+  <div className="bg-slate-900 rounded-2xl shadow-xl border border-slate-800 p-5 flex gap-3">
+    <a href="/edit" className="flex-1 text-center bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 text-sm font-semibold py-2.5 px-4 rounded-xl transition-all">
+      Edit Profile
+    </a>
   </div>
 );
+
 const ToggleSwitch = ({ checked, onChange }) => (
-  <button type="button" className={`${checked ? "bg-green-500" : "bg-gray-300"} relative inline-flex h-6 w-11 rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2`} role="switch" aria-checked={checked} onClick={() => onChange(!checked)}>
-    <span aria-hidden="true" className={`${checked ? "translate-x-5" : "translate-x-0"} inline-block h-5 w-5 transform bg-white rounded-full shadow-lg transition duration-200 ease-in-out mt-0.5 ml-0.5`} />
+  <button 
+    type="button" 
+    className={`${checked ? "bg-green-500" : "bg-slate-700"} relative inline-flex h-6 w-11 rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-slate-900`} 
+    role="switch" 
+    aria-checked={checked} 
+    onClick={() => onChange(!checked)}
+  >
+    <span 
+      aria-hidden="true" 
+      className={`${checked ? "translate-x-5" : "translate-x-0"} inline-block h-5 w-5 transform bg-white rounded-full shadow-md transition duration-200 ease-in-out mt-0.5 ml-0.5`} 
+    />
   </button>
 );

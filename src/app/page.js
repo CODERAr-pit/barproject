@@ -378,7 +378,7 @@ export default function Home() {
                 type="text"
                 placeholder="Type a message..."
                 value={input}
-                onChange={handleInput}
+                onChange={(e) => setInput(e.target.value)}
                 disabled={isLoading}
                 className="flex-1 p-2 bg-slate-900 border border-slate-700 text-white text-sm rounded-lg focus:outline-none focus:ring-1 focus:ring-red-500 disabled:opacity-50"
               />

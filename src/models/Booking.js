@@ -27,7 +27,7 @@ const BookingSchema = new mongoose.Schema(
     endTime:   { type: Date, required: true }, // e.g., 2025-11-30T10:30:00Z
 
     // 5. Details
-    serviceType: { type: String, required: true }, // "Haircut", "Shave"
+    serviceType: [{ type: String, required: true }], // "Haircut", "Shave"
     status: { 
       type: String, 
       enum: ["confirmed", "empty"], 
