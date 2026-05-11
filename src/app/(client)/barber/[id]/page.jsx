@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react"; // Use NextAuth session
 
 export default function BarberDetailPage() {
   const { id } = useParams();
-  const { data: session } = useSession(); // ✅ Hooks must be at the top level
+  const { data: session } = useSession(); 
 
   const [barber, setBarber] = useState(null);
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -62,7 +62,6 @@ export default function BarberDetailPage() {
   const fetchSlots = async () => {
     if (!barber?._id || !date) return;
     
-    // ✅ API returns specific "Free Time Strings", not database objects
     const res = await fetch(`/api/bookings?barberId=${barber._id}&date=${date}`);
     const result = await res.json();
     

@@ -107,7 +107,6 @@ export default function Home() {
   }, []); 
 
   const handleClick = (item) => {
-  // Accept either the full object or just the ID string
   const barberId = typeof item === 'string' ? item : item._id;
 
   // Safety Check

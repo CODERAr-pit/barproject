@@ -78,7 +78,7 @@ export async function GET(request) {
     const date = searchParams.get('date');
     const scope = searchParams.get('scope'); // New param to detect 'upcoming'
 
-    // --- SCENARIO A: Get Customer History (For User Profile) ---
+    // --- SCENARIO : Get Customer History (For User Profile) ---
     if (userId) {
       const history = await Booking.find({ user: userId })
         .populate('barber', 'shopName shopImage')
@@ -87,7 +87,7 @@ export async function GET(request) {
       return NextResponse.json({ data: history }, { status: 200 });
     }
 
-    // --- SCENARIO B: Get Barber's Upcoming 7 Days (For Barber Dashboard) ---
+    // (For Barber Dashboard) ---
     // Triggered when we send ?barberId=...&scope=upcoming
     if (barberId && scope === 'upcoming') {
         
@@ -106,7 +106,7 @@ export async function GET(request) {
         return NextResponse.json({ data: upcomingBookings }, { status: 200 });
     }
 
-    // --- SCENARIO C: Calculate Free Slots (For Booking Page) ---
+    // --- SCENARIO : Calculate Free Slots (For Booking Page) ---
     if (barberId && date) {
       const busySlots = await getBusySlots(barberId, date);
       
@@ -167,9 +167,7 @@ export async function POST(request) {
     }
 
     try {
-      // ==========================================
-      // 🔒 YOU ARE NOW INSIDE THE SAFE LOCKED ZONE
-      // ==========================================
+      //THE SAFE LOCKED ZOne
 
       // 2a. Check if slot is blocked
       const barberDoc = await Barber.findById(barber);
@@ -233,7 +231,7 @@ export async function POST(request) {
       return NextResponse.json({ success: true, data: newBooking }, { status: 201 });
 
     } finally {
-      // 5. CRITICAL: Always delete the lock when you are done, 
+      // 5. CRITICAL: Always delete the lock when  done, 
       // even if the database throws an error!
       await redis.del(lockKey);
     }
