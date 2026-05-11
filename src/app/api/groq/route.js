@@ -42,7 +42,7 @@ export async function POST(request) {
 
       // 'data' will look like: { data: [ { name: "Arpit's Cuts", distance: "2.12 km" }, ... ] }
       const data = await res.json(); 
-      
+      console.log("ye rh data",data.data);
       return NextResponse.json(
         {
           response: "I found these barbers near your location! Click one to see their slots.", // AI text bubble

@@ -2,7 +2,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import BookingGrid from "@/components/BookingGrid";
 import Hashids from 'hashids';
 
 const hashids = new Hashids("your_secret_salt", 8);
@@ -158,7 +157,7 @@ export default function Home() {
               sender: "bot",
               text: data.response,
               uiType: data.uiType,
-              payload: data.data,
+              payload: data.payload,
             },
           ]);
 
@@ -350,9 +349,24 @@ export default function Home() {
                       </div>
                     )}
 
-                    {msg.uiType === "barber_ui" && (
-                      <div className="mt-2 w-full bg-slate-800 border border-slate-600 rounded-lg p-3 shadow-lg">
-                        <BookingGrid barberInfo={msg.response} />
+                    {msg.uiType === "barber_ui" && msg.payload && (
+                      <div className="mt-2 w-full space-y-2">
+                        {msg.payload.map((barber, idx) => (
+                          <div key={idx} className="bg-slate-800 border border-slate-600 rounded-lg p-3 shadow-lg">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h4 className="text-white font-semibold">{barber.shopName}</h4>
+                                <p className="text-slate-400 text-sm">Owner: {barber.firstName} • {barber.distance}</p>
+                              </div>
+                              <button
+                                onClick={() => handleClick(barber)}
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
+                              >
+                                Book Now
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
