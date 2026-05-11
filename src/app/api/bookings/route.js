@@ -84,7 +84,7 @@ export async function GET(request) {
         
         const today = new Date();
         const nextDay = new Date();
-        nextDay.setDate(today.getDate() + 1); // Add 7 days
+        nextDay.setDate(today.getDate() + 7); // Show the next 7 days
 
         const upcomingBookings = await Booking.find({
             barber: barberId,
