@@ -21,18 +21,11 @@ const getBusySlots = async (barberID, dateString) => {
   const barber = await Barber.findById(barberID);
   let formattedBlockedSlots = [];
 
-  console.log("🔍 DEBUG - Checking blocked slots for barber:", barberID);
-  console.log("🔍 DEBUG - Barber exists:", barber ? "YES" : "NO");
-  console.log("🔍 DEBUG - barber.schedule:", barber?.schedule);
-  console.log("🔍 DEBUG - barber.schedule.blockedSlots:", barber?.schedule?.blockedSlots);
-  console.log("🔍 DEBUG - Looking for date:", dateString);
 
   if (barber && barber.schedule && (barber.schedule.blockedSlots || []).length > 0) {
     const dayBlock = barber.schedule.blockedSlots.find(bs => bs.date === dateString);
-    console.log("🔍 DEBUG - Found dayBlock for date:", dayBlock);
 
     if (dayBlock && dayBlock.slots && dayBlock.slots.length > 0) {
-      console.log("🔍 DEBUG - Converting blocked slots:", dayBlock.slots);
       formattedBlockedSlots = dayBlock.slots.map((timeStr) => {
         const [time, modifier] = timeStr.split(" ");
         let [hours, minutes] = time.split(":");
@@ -53,11 +46,9 @@ const getBusySlots = async (barberID, dateString) => {
           endTime: slotEnd
         };
       });
-      console.log("✅ Total blocked slots converted:", formattedBlockedSlots.length);
     }
   }
   const allBusy = [...bookedSlots, ...formattedBlockedSlots];
-  console.log("⚠️  Total busy slots:", allBusy.length, "(Bookings:", bookedSlots.length, "+ Blocked:", formattedBlockedSlots.length + ")");
   return allBusy;
 };
 
