@@ -76,27 +76,27 @@ export default function HomeClient({ initialBarbers }) {
     }
   };
 
+
+
+  
   useEffect(() => {
     if (isChatOpen) {
       scrollToBottom();
     }
   }, [messages, isChatOpen]);
 
-  const handleClick = (item) => {
-    const barberId = typeof item === 'string' ? item : item._id;
 
-    if (!barberId) {
-      alert("Oops! This barber is missing a valid ID. Check the console.");
-      return;
-    }
+
+  const handleClick = (item) => {
 
     try {
-      const shortId = hashids.encodeHex(barberId);
-      router.push(`/barber/${shortId}`);
+      router.push(`/barber/${item}`);
     } catch (error) {
       console.error("🚨 Hashids failed to encode. Make sure the ID is a valid hex string:", barberId);
     }
   };
+
+
 
   const handleSendMessage = async (e) => {
     e?.preventDefault();
@@ -153,6 +153,11 @@ export default function HomeClient({ initialBarbers }) {
     }
   };
 
+
+
+
+
+
 //   if (status === "loading") {
 //     return (
 //       <div className="min-h-screen flex items-center justify-center bg-slate-950">
@@ -178,7 +183,7 @@ export default function HomeClient({ initialBarbers }) {
             <div className="grid grid-cols-1 gap-6">
               {barbers.map((item, index) => (
                 <div
-                  onClick={() => handleClick(item._id)}
+                  onClick={() => handleClick(item.id)}
                   key={index}
                   className="bg-slate-900 hover:cursor-grabbing border border-slate-800 rounded-2xl p-5 shadow-lg hover:shadow-slate-800/40 hover:border-slate-700 transition-all duration-300"
                 >

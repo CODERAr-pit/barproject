@@ -1,32 +1,35 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { useSession } from "next-auth/react"; // Use NextAuth session
+import { useSession } from "next-auth/react"; 
 
 export default function BarberDetailPage() {
-  const { id } = useParams();
+  // 1. Grab the safe HashID straight from the URL
+  const { id } = useParams(); 
   const { data: session } = useSession(); 
 
   const [barber, setBarber] = useState(null);
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [slots, setSlots] = useState([]);
-  const [selectedSlot, setSelectedSlot] = useState(null); // Will store the Time String
-  const [service, setService] = useState([]);
+  const [selectedSlot, setSelectedSlot] = useState(null); 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [time,setTime]=useState();
+  
+  // Cleaned up unused states!
+  const [selectedServices, setSelectedServices] = useState([]);
  
   const serviceDurations = {
-  "Haircut": 30,
-  "Spa": 60,
-  "Beardset": 20,
-  "Hairwash": 15,
-  "Facewash": 15,
-  "Men": 0,
-  "Women": 0,
-  "Children (18-)": 0
-};
- // 1. Load Barber Details
+    "Haircut": 30,
+    "Spa": 60,
+    "Beardset": 20,
+    "Hairwash": 15,
+    "Facewash": 15,
+    "Men": 0,
+    "Women": 0,
+    "Children (18-)": 0
+  };
+
+  // Load Barber Details
   useEffect(() => {
     const load = async () => {
       try {
@@ -43,44 +46,54 @@ export default function BarberDetailPage() {
     if (id) load();
   }, [id]);
 
-  // 2. Fetch Available Slots
-  const [selectedServices, setSelectedServices] = useState([]);
 
   const handleChange = (e, item) => {
     const isChecked = e.target.checked;
-
     if (isChecked) {
       setSelectedServices((prev) => [...prev, item]);
     } else {
       setSelectedServices((prev) => prev.filter((service) => service !== item));
     }
   }
+
   const totalTime = selectedServices.reduce((total, service) => {
     return total + (serviceDurations[service] || 0);
   }, 0);
 
+  // 2. FIXED: Use `id` from the URL, not barber.id!
   const fetchSlots = async () => {
-    if (!barber?._id || !date) return;
+    if (!id || !date) return; 
     
-    const res = await fetch(`/api/bookings?barberId=${barber._id}&date=${date}`);
-    const result = await res.json();
-    
-    if (result.data) {
-        setSlots(result.data); // These are strings like "2025-10-05T09:00:00.000Z"
-    } else {
-        setSlots([]);
+    try {
+      const res = await fetch(`/api/bookings?barberId=${id}&date=${date}`);
+      const result = await res.json();
+      
+      if (res.ok && result.data) {
+          setSlots(result.data); 
+      } else {
+          setSlots([]);
+      }
+      setSelectedSlot(null);
+    } catch (err) {
+      console.error("Failed to fetch slots", err);
+      setSlots([]);
     }
-    setSelectedSlot(null);
   };
 
-  useEffect(() => { fetchSlots(); }, [barber?._id, date]);
+  useEffect(() => { fetchSlots(); }, [id, date]);
+
 
   const handleBook = async () => {
     try {
-      if (!selectedSlot || !service) return alert("Select slot and service");
+      // 3. FIXED: Check selectedServices correctly
+      if (!selectedSlot || selectedServices.length === 0) {
+        return alert("Please select a time slot and at least one service.");
+      }
 
-      const userId = session?.user?.id;
-      if (!userId) return alert("Please log in to book");
+      // 4. Require login
+      if (!session || !session.user) {
+        return alert("Please log in to book an appointment.");
+      }
 
       const startDate = new Date(selectedSlot);
       const endDate = new Date(startDate.getTime() + totalTime * 60000);
@@ -89,20 +102,23 @@ export default function BarberDetailPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-            user: userId,         
-            barber: barber._id,    
+            // We removed user: userId because the backend securely grabs it from the session now!
+            barber: id, 
+            user: null,   // 👈 FIXED: Use the HashID from the URL
             date: date,
             start: startDate,      
             end: endDate,
-            serviceType: selectedServices 
+            service: selectedServices // 👈 FIXED: Matches the backend Zod schema!
         }),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Booking failed"); // API returned 'message'
+      
+      if (!res.ok) throw new Error(data.message || data.error || "Booking failed"); 
       
       alert("Booking confirmed!");
       fetchSlots(); // Refresh to remove the booked slot
+      setSelectedServices([]); // Clear the form
     } catch (e) {
       alert(e.message);
     }
@@ -176,7 +192,6 @@ export default function BarberDetailPage() {
             <input
               type="checkbox"
               onChange={(e) => handleChange(e, s)}
-              // Ensure the checkbox UI matches the state
               checked={selectedServices.includes(s)}
               className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
             />
@@ -200,6 +215,13 @@ export default function BarberDetailPage() {
       <div className="bg-gray-800 border border-gray-700 rounded-2xl p-6 shadow-lg">
         <h2 className="text-xl font-bold mb-4 text-white">Available Time Slots</h2>
         
+        {/* Added a friendly warning if they aren't logged in! */}
+        {!session && (
+           <div className="mb-4 p-3 bg-yellow-900/30 border border-yellow-700 text-yellow-400 text-sm rounded-lg">
+             Please log in to view available time slots and make a booking.
+           </div>
+        )}
+
         {slots.length === 0 ? (
             <div className="text-center py-10 border-2 border-dashed border-gray-700 rounded-xl text-gray-500">
                 No slots available for this date.
@@ -207,13 +229,12 @@ export default function BarberDetailPage() {
         ) : (
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
             {slots.map((timeString) => {
-                // Formatting the time for display (e.g., "10:30 AM")
                 const timeLabel = new Date(timeString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 const isSelected = selectedSlot === timeString;
 
                 return (
                     <button
-                        key={timeString} // Use the string itself as the key
+                        key={timeString} 
                         onClick={() => setSelectedSlot(timeString)}
                         className={`py-2 px-1 rounded-lg text-sm font-medium transition-all ${
                             isSelected 
@@ -230,7 +251,7 @@ export default function BarberDetailPage() {
 
         <div className="mt-8 border-t border-gray-700 pt-6 flex justify-end">
           <button 
-            disabled={!selectedSlot || !service} 
+            disabled={!selectedSlot || selectedServices.length === 0} 
             onClick={handleBook} 
             className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transition-all"
           >

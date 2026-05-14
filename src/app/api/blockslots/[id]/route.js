@@ -3,6 +3,7 @@ import dbConnect from "@/lib/db";
 import Barber from "@/models/Barber";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { hashedMongoId } from "@/lib/validations";
 export async function PATCH(request, { params }) {
   try {
     const session = await getServerSession(authOptions);
@@ -20,8 +21,8 @@ export async function PATCH(request, { params }) {
     if (!date || !slots || !Array.isArray(slots) || slots.length === 0) {
       return NextResponse.json({ error: "Invalid data provided." }, { status: 400 });
     }
-
-    const barber = await Barber.findById(barberId);
+    const mongoId = hashedMongoId.safeParse(barberId);
+    const barber = await Barber.findById(mongoId.data);
     
     if (!barber) {
       return NextResponse.json({ error: "Barber not found." }, { status: 404 });
@@ -44,7 +45,7 @@ export async function PATCH(request, { params }) {
 
     // Use findByIdAndUpdate to ensure persistence
     const updatedBarber = await Barber.findByIdAndUpdate(
-      barberId,
+      mongoId.data,
       { "schedule.blockedSlots": barber.schedule.blockedSlots },
       { new: true } // Return updated document
     );

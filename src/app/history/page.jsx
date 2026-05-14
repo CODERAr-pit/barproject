@@ -9,7 +9,6 @@ export default function BookingHistory() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    // 1. Don't fetch if the user isn't logged in yet
     if (status === "loading") return;
     if (status === "unauthenticated") {
       setError("Please log in to view your booking history.");
@@ -37,7 +36,6 @@ export default function BookingHistory() {
     fetchHistory();
   }, [session, status]);
 
-  // Helper functions to make the ugly database dates look pretty
   const formatDate = (dateString) => {
     const options = { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' };
     return new Date(dateString).toLocaleDateString(undefined, options);

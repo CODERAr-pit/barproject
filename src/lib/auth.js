@@ -1,133 +1,131 @@
 import GoogleProvider from "next-auth/providers/google";
-import GitHubProvider from "next-auth/providers/github";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { MongoDBAdapter } from "@auth/mongodb-adapter";
 import { clientPromise } from "@/lib/db";
-import bcrypt from "bcryptjs";
-import User from "@/models/User";
+import User from "@/models/User";       
+import Barber from "@/models/Barber";   
 import dbConnect from "@/lib/db";
+import bcrypt from "bcryptjs";
+// Note: You must update LoginValidation in your zod file to accept a 'role' string!
+import { LoginValidation } from "@/lib/validations"; 
+import { hashids } from "@/lib/hash";
 
 export const authOptions = {
   adapter: MongoDBAdapter(clientPromise),
-  secret: process.env.NEXTAUTH_SECRET || "fallback-secret-for-development-only",
+  secret: process.env.NEXTAUTH_SECRET,
 
   providers: [
+    // ----------------------------------------------------
+    // GOOGLE: Customers Only
+    // ----------------------------------------------------
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      allowDangerousEmailAccountLinking: true,
     }),
-    GitHubProvider({
-      clientId: process.env.GITHUB_CLIENT_ID,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET,
-      allowDangerousEmailAccountLinking: true,
-    }),
+
+    // ----------------------------------------------------
+    // CREDENTIALS: Both Barbers and Customers
+    // ----------------------------------------------------
     CredentialsProvider({
       name: "Credentials",
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        role: { label: "Role", type: "text" } // 👈 New traffic director!
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error("Email and password required");
-        }
-
-        await dbConnect();
+        const result = LoginValidation.safeParse(credentials);
+        if (!result.success) throw new Error("Invalid format"); 
         
-        const user = await User.findOne({ email: credentials.email });
-        if (!user) {
-          throw new Error("No user found with this email");
+        const { email, password, role } = result.data;
+        await dbConnect();
+        console.log(result.data);
+        // ==========================================
+        // ROUTE A: BARBER LOGIN
+        // ==========================================
+        if (role === "barber") {
+          const barber = await Barber.findOne({ email });
+          if (!barber) throw new Error("No barber account found.");
+          
+          const isValid = await bcrypt.compare(password, barber.password); 
+          if (!isValid) throw new Error("Invalid password");
+
+          return {
+            id: barber._id.toString(),
+            email: barber.email,
+            name: barber.shopName || barber.firstName,
+            role: "barber",
+          };
+        } 
+        
+        // ==========================================
+        // ROUTE B: CUSTOMER LOGIN
+        // ==========================================
+        else if (role === "customer") {
+          const user = await User.findOne({ email });
+          if (!user) throw new Error("No customer account found.");
+          if (!user.password) throw new Error("Please sign in with Google.");
+          
+          const isValid = await user.comparePassword(password);
+          if (!isValid) throw new Error("Invalid password");
+
+          return {
+            id: user._id.toString(),
+            email: user.email,
+            name: user.username,
+            role: "customer",
+          };
         }
 
-        if (!user.password) {
-          throw new Error("Please sign in with your social account");
-        }
-
-        const isValid = await user.comparePassword(credentials.password);
-        if (!isValid) {
-          throw new Error("Invalid password");
-        }
-
-        return {
-          id: user._id.toString(),
-          email: user.email,
-          name: user.username,
-          role: user.role,
-        };
+        // If a hacker tampers with the role field
+        throw new Error("Invalid login type specified");
       },
     }),
   ],
 
-callbacks: {
-  async jwt({ token, user }) {
-    // Persist user id and role on the token for session usage
-    if (user) {
-      token.id = user.id || user._id?.toString();
-      if (user.role) token.role = user.role;
-    }
-    return token;
-  },
-
-  async session({ session, token }) {
-    // Expose id (and role if available) on the client session
-    if (token) {
-      session.user.id = token.id || token.sub || session.user.id;
-      if (token.role && !session.user.role) session.user.role = token.role;
-    }
-    return session;
-  },
-
-  async signIn({ user, account, profile }) {
-    await dbConnect();
-
-    let existingUser = await User.findOne({ email: user.email });
-
-    if (!existingUser) {
-      // Create a new user for first-time OAuth
-      existingUser = await User.create({
-        email: user.email,
-        username: user.name,
-        role: "customer",
-        image: user.image || null,
-      });
-    } else {
-      // Optional: update profile fields if missing
-      let updated = false;
-
-      if (!existingUser.username && user.name) {
-        existingUser.username = user.name;
-        updated = true;
-      }
-      if (!existingUser.image && user.image) {
-        existingUser.image = user.image;
-        updated = true;
-      }
-      if (!existingUser.role) {
-        existingUser.role = "customer";
-        updated = true;
-      }
-
-      if (updated) await existingUser.save();
-    }
-
-    // ✅ Always allow sign in for OAuth, even if email already exists
-    return true;
-  },
-}
-,
-
-  pages: {
-    signIn: '/login', // This matches your app/login/page.js structure
-  },
-
-  session: {
-    strategy: "jwt",
-  },
-
-  events: {
+  callbacks: {
+    // ----------------------------------------------------
+    // Google SignIn Handler (Creates/Finds Customer)
+    // ----------------------------------------------------
     async signIn({ user, account }) {
-      console.log("✅ User signed in:", user.email, "via", account.provider);
+      await dbConnect();
+      if (account.provider === "credentials") return true;
+
+      let existingUser = await User.findOne({ email: user.email });
+      if (!existingUser) {
+        existingUser = await User.create({
+          email: user.email,
+          username: user.name,
+          role: "customer", 
+          image: user.image || null,
+        });
+      }
+
+      user.id = existingUser._id.toString();
+      user.role = "customer";
+      return true;
+    },
+
+    // ----------------------------------------------------
+    // The Bottleneck (Hashes IDs perfectly for EVERYONE)
+    // ----------------------------------------------------
+    async jwt({ token, user }) {
+      if (user) {
+        const rawId = user.id || user._id?.toString();
+        token.id = hashids.encodeHex(rawId); 
+        token.role = user.role; 
+      }
+      return token;
+    },
+
+    async session({ session, token }) {
+      if (token) {
+        session.user.id = token.id;
+        session.user.role = token.role;
+      }
+      return session;
     },
   },
+  
+  session: { strategy: "jwt" },
 };

@@ -2,12 +2,15 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-export default function BarberSignup() {
+import { signIn } from "next-auth/react"; // 👈 1. Import NextAuth
+
+export default function BarberLogin() { // Renamed from BarberSignup since it's a login form!
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(""); // 👈 Added for better UI error handling
   const router = useRouter();
 
   const handleChange = (e) => {
@@ -17,42 +20,46 @@ export default function BarberSignup() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError(""); // Clear any old errors
 
     try {
-      const res = await fetch("/api/barberlogin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...formData
-        }),
+      // 2. Call NextAuth directly! No custom API route needed.
+      const res = await signIn("credentials", {
+        redirect: false, // We handle the redirect manually below
+        email: formData.email,
+        password: formData.password,
+        role: "barber", // 👈 3. The Traffic Director! Tells NextAuth to check the Barber DB
       });
 
-      const data = await res.json();
-
-      if (data.success) {
-      // ✅ Store barber details locally
-      localStorage.setItem("barber", JSON.stringify(data.user));
-
-      // ✅ Redirect to dashboard
-      router.push(data.redirectUrl);
-    } else {
-        // Show error message
-        alert(data.error || "Login failed");
+      if (res?.error) {
+        // If the password was wrong, or Zod failed, NextAuth sends the error string here
+        setError(res.error);
+      } else if (res?.ok) {
+        router.push("/dashboard"); 
+        router.refresh(); // Forces Next.js to update the session state globally
       }
     } catch (err) {
       console.error(err);
-      alert("Error submitting form");
+      setError("An unexpected error occurred");
     } finally {
       setLoading(false);
     }
   };
+
   return (
     <div className="flex justify-center items-center h-screen bg-gray-100">
       <form
         onSubmit={handleSubmit}
-        className="bg-slate-600 shadow-lg rounded-2xl p-6 w-96"
+        className="bg-slate-800 shadow-lg rounded-2xl p-6 w-96 text-white"
       >
         <h2 className="text-2xl font-bold mb-4 text-center">Barber Shop Login</h2>
+
+        {/* Display NextAuth errors nicely */}
+        {error && (
+          <div className="mb-4 p-2 bg-red-500/20 border border-red-500 text-red-400 text-sm rounded text-center">
+            {error}
+          </div>
+        )}
 
         <input
           type="email"
@@ -60,7 +67,7 @@ export default function BarberSignup() {
           placeholder="E-Mail"
           value={formData.email}
           onChange={handleChange}
-          className="w-full mb-3 p-2 border rounded"
+          className="w-full mb-3 p-2 border border-slate-600 bg-slate-700 rounded text-white"
           required
         />
         <input
@@ -69,25 +76,28 @@ export default function BarberSignup() {
           placeholder="Password"
           value={formData.password}
           onChange={handleChange}
-          className="w-full mb-3 p-2 border rounded"
+          className="w-full mb-3 p-2 border border-slate-600 bg-slate-700 rounded text-white"
           required
         />
-        <div className="flex justify-between p-3">
-        <button
-        type="submit"
-        className="w-32 bg-blue-300 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg"
-        onClick={handleSubmit}
->
-  Submit
-</button>
+        <div className="flex justify-between items-center mt-4">
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-32 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
+          >
+            {loading ? "Loading..." : "Submit"}
+          </button>
 
-       <div>
-       <Link href="/barberSignUp" className="hover:text-blue-400 hover:p-2.5 transition-colors " >
-          Sign-Up</Link></div>
+          <div>
+            <Link 
+              href="/barberSignUp" 
+              className="text-slate-300 hover:text-blue-400 transition-colors text-sm" 
+            >
+              Sign-Up
+            </Link>
+          </div>
         </div>
-        </form></div>
-        
-  )
+      </form>
+    </div>
+  );
 }
-
-

@@ -77,6 +77,7 @@ export default function LogIn() {
         email,
         password,
         redirect: false,
+        role: "customer"
       })
       
       if (result?.error) {

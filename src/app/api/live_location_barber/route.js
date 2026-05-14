@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import connectDB from "@/lib/db";
 import Barber from "@/models/Barber";
 import mongoose from "mongoose";
+import { hashids } from "@/lib/hash"; // 👈 1. Import your hash tool!
 
 export async function POST(request) {
   try {
@@ -15,45 +16,49 @@ export async function POST(request) {
       );
     }
 
-    // Call Upstash REST API directly — no SDK needed
     const redisRes = await fetch(
-  `${process.env.UPSTASH_REDIS_REST_URL}/geosearch/Barber/FROMLONLAT/${Number(lng)}/${Number(lat)}/BYRADIUS/5/km/ASC/WITHDIST`,
-  {
-    headers: {
-      Authorization: `Bearer ${process.env.UPSTASH_REDIS_REST_TOKEN}`,
-    },
-  }
-);
+      `${process.env.UPSTASH_REDIS_REST_URL}/geosearch/Barber/FROMLONLAT/${Number(lng)}/${Number(lat)}/BYRADIUS/5/km/ASC/WITHDIST`,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.UPSTASH_REDIS_REST_TOKEN}`,
+        },
+      }
+    );
 
-const redisData = await redisRes.json();
-console.log("Geosearch results:", redisData);
+    const redisData = await redisRes.json();
 
-// With WITHDIST, result is array of [memberId, distance] pairs
-// e.g. [["barberId1", "0.5432"], ["barberId2", "2.1234"]]
-const barberIdList = redisData.result;
+    const barberIdList = redisData.result;
 
-if (!barberIdList || barberIdList.length === 0) {
-  return NextResponse.json({ data: [] });
-}
+    if (!barberIdList || barberIdList.length === 0) {
+      return NextResponse.json({ data: [] });
+    }
 
-// Separate IDs and distances
-const barberIds = barberIdList.map(item => new mongoose.Types.ObjectId(item[0]));
-const distanceMap = {};
-barberIdList.forEach(item => {
-  distanceMap[item[0]] = parseFloat(item[1]).toFixed(2); // km, 2 decimal places
-});
+    const barberIds = barberIdList.map(item => new mongoose.Types.ObjectId(item[0]));
+    const distanceMap = {};
+    barberIdList.forEach(item => {
+      distanceMap[item[0]] = parseFloat(item[1]).toFixed(2); 
+    });
 
-const barbers = await Barber.find({
-  _id: { $in: barberIds }
-}).select("-password");
+    const barbers = await Barber.find({
+      _id: { $in: barberIds }
+    }).select("-password");
 
-// Attach distance to each barber object
-const barbersWithDistance = barbers.map(barber => ({
-  ...barber.toObject(),
-  distance: `${distanceMap[barber._id.toString()]} km`
-}));
+    // 2. 🛡️ THE SHIELD: Convert to HashID right before it leaves the server
+    const barbersWithDistance = barbers.map(barber => {
+      const rawIdStr = barber._id.toString();
+      const safeData = barber.toObject();
+      
+      // Delete the raw internal ID so hackers can't see it in the network tab
+      delete safeData._id; 
 
-return NextResponse.json({ data: barbersWithDistance });
+      return {
+        ...safeData,
+        id: hashids.encodeHex(rawIdStr), // 👈 Inject the secure HashID
+        distance: `${distanceMap[rawIdStr]} km`
+      };
+    });
+
+    return NextResponse.json({ data: barbersWithDistance });
 
   } catch (error) {
     console.error("Redis Geosearch Error:", error);
