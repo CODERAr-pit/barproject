@@ -7,8 +7,10 @@ import { redis } from "@/lib/redis";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { BookingValidation, GetQueryValidation, hashedMongoId } from "@/lib/validations";
-
+import { Client } from "@upstash/qstash";
 // ... (Your getBusySlots helper stays exactly the same) ...
+const qstash = new Client({ token: process.env.QSTASH_TOKEN });
+
 const getBusySlots = async (barberID, dateString) => {
   const startOfDay = new Date(`${dateString}T00:00:00.000Z`);
   const endOfDay = new Date(`${dateString}T23:59:59.999Z`);
@@ -217,6 +219,10 @@ export async function POST(request) {
           }
         }
       }
+      const currUser = await User.findById(user);
+      const email = currUser.email;
+      const shop = await Barber.findById(barber);
+      const shopName = shop.shopName;
 
       const existingBooking = await Booking.findOne({
         barber,
@@ -231,7 +237,7 @@ export async function POST(request) {
       if (existingBooking) {
         return NextResponse.json({ message: "Slot already taken" }, { status: 409 });
       }
-
+      
       const newBooking = await Booking.create({
         barber,
         user,
@@ -241,6 +247,15 @@ export async function POST(request) {
         serviceType: service,
         status: "confirmed",
       });
+
+    await qstash.publishJSON({
+    url: "https://unfitted-cornbread-progress.ngrok-free.dev/api/email", 
+    body: {
+      email: email,
+      barberName: shopName,
+      time: start
+    },
+  });
 
       return NextResponse.json({ success: true, data: newBooking }, { status: 201 });
 
