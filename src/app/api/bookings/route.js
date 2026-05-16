@@ -249,7 +249,7 @@ export async function POST(request) {
       });
 
     const res = await qstash.publishJSON({
-    url: "https://unfitted-cornbread-progress.ngrok-free.dev/api/email",//"https://barproject.vercel.app/api/email"
+    url: "https://barproject.vercel.app/api/email",//"https://unfitted-cornbread-progress.ngrok-free.dev/api/email",//"https://barproject.vercel.app/api/email"
     body: {
       email: email,
       barberName: shopName,
