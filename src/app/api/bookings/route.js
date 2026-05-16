@@ -247,15 +247,16 @@ export async function POST(request) {
         serviceType: service,
         status: "confirmed",
       });
-
-    await qstash.publishJSON({
-    url: "https://barproject.vercel.app/api/email", //"https://unfitted-cornbread-progress.ngrok-free.dev/api/email"
+      //"https://unfitted-cornbread-progress.ngrok-free.dev/api/email"
+    const res = await qstash.publishJSON({
+    url: "https://barproject.vercel.app/api/email",
     body: {
       email: email,
       barberName: shopName,
       time: start
     },
   });
+    console.log("after firing ",res);
 
       return NextResponse.json({ success: true, data: newBooking }, { status: 201 });
 
