@@ -1,10 +1,19 @@
-
 import { getBarbers } from "@/lib/getBarbers";
 import HomeClient from "./HomeClient"; 
-// export const dynamic = "force-dynamic";//fordynamic render
-export const revalidate = 60;//to render dynamic data in every 60 sec
-export default async function Home() {
-  const initialBarbers = await getBarbers();
 
-  return <HomeClient initialBarbers={initialBarbers} />;
+export const revalidate = 60; 
+
+export default async function Home({ searchParams }) {
+  const params = await searchParams;
+  
+  const currentPage = params?.page ? Number(params.page) : 1;
+  const limit = 10; 
+
+  const initialBarbers = await getBarbers(currentPage, limit);
+  return (
+    <HomeClient 
+      initialBarbers={initialBarbers}
+      page={currentPage}
+    />
+  );
 }

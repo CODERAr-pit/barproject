@@ -11,7 +11,8 @@ let cached = global.mongoose;
 if (!cached) {
   cached = global.mongoose = { conn: null, promise: null };
 }
-
+//conn means connection is live while promise means will give u connection waiit, promis is used for simultaneous user going for conneciton 
+//so there couldnt be so much flood of connection we are using promise that request has gone from sever for connection mongodb
 async function dbConnect() {
   if (cached.conn) {
     return cached.conn;

@@ -37,7 +37,7 @@ const BarberSchema = new mongoose.Schema({
     default: [],
   },
   shopImage: {
-    type: String, // store image URL or path
+    type: String, 
     default: null,
   },
   barberImage: {
@@ -99,47 +99,18 @@ const BarberSchema = new mongoose.Schema({
     default: null,
   },
   
-  // ✅ FIXED SCHEDULE SECTION
   schedule: {
-    monday: {
-      start: { type: String, default: "09:00" },
-      end: { type: String, default: "17:00" },
-      isOff: { type: Boolean, default: false },
-    },
-    tuesday: {
-      start: { type: String, default: "09:00" },
-      end: { type: String, default: "17:00" },
-      isOff: { type: Boolean, default: false },
-    },
-    wednesday: {
-      start: { type: String, default: "09:00" },
-      end: { type: String, default: "17:00" },
-      isOff: { type: Boolean, default: false },
-    },
-    thursday: {
-      start: { type: String, default: "09:00" },
-      end: { type: String, default: "17:00" },
-      isOff: { type: Boolean, default: false },
-    },
-    friday: {
-      start: { type: String, default: "09:00" },
-      end: { type: String, default: "20:00" }, // Late night!
-      isOff: { type: Boolean, default: false },
-    },
-    saturday: {
-      start: { type: String, default: "10:00" },
-      end: { type: String, default: "15:00" },
-      isOff: { type: Boolean, default: false },
-    },
-    sunday: {
-      start: { type: String, default: "00:00" },
-      end: { type: String, default: "00:00" },
-      isOff: { type: Boolean, default: true }, // Default Day Off
-    },
+    workingDays: [{ type: String, enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] }],
+    
+    openTime: { type: String, default: "09:00" }, 
+    closeTime: { type: String, default: "17:00" },
+    
+    breakStart: { type: String, default: "13:00" },
+    breakEnd: { type: String, default: "14:00" },
     blockedSlots: [
   {
-    date: { type: String, required: true }, // e.g., "2026-05-11"
-    slots: [{ type: String }]               // e.g., ["01:00 PM", "01:30 PM"]
+    date: { type: String, required: true }, 
+    slots: [{ type: String }]    
   }
 ]
   },

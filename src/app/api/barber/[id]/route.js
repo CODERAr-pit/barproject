@@ -5,9 +5,10 @@ import { getServerSession } from "next-auth";
 import { hashedMongoId } from "@/lib/validations";
 import { authOptions } from "@/lib/auth";
 import { UpdateBarberValidation } from "@/lib/validations";
+
+
 export async function GET(_req, { params }) {
   const session = await getServerSession(authOptions);
-    
   if (!session || !session.user) {
     return NextResponse.json(
       { error: "Unauthorized. You must be logged in." }, 
@@ -29,7 +30,6 @@ export async function GET(_req, { params }) {
     const realMongoId = result.data;
     await dbConnect();
     
-    // Direct lookup, hiding sensitive fields
     const barber = await Barber.findById(realMongoId).select("-password -aadharNumber -aadharFront -aadharBack -selfieWithAadhar").lean();
     
     if (!barber) return NextResponse.json({ error: "Not found" }, { status: 404 });

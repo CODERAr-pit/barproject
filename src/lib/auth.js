@@ -6,7 +6,6 @@ import User from "@/models/User";
 import Barber from "@/models/Barber";   
 import dbConnect from "@/lib/db";
 import bcrypt from "bcryptjs";
-// Note: You must update LoginValidation in your zod file to accept a 'role' string!
 import { LoginValidation } from "@/lib/validations"; 
 import { hashids } from "@/lib/hash";
 
@@ -15,23 +14,16 @@ export const authOptions = {
   secret: process.env.NEXTAUTH_SECRET,
 
   providers: [
-    // ----------------------------------------------------
-    // GOOGLE: Customers Only
-    // ----------------------------------------------------
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     }),
-
-    // ----------------------------------------------------
-    // CREDENTIALS: Both Barbers and Customers
-    // ----------------------------------------------------
     CredentialsProvider({
       name: "Credentials",
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
-        role: { label: "Role", type: "text" } // 👈 New traffic director!
+        role: { label: "Role", type: "text" } //
       },
       async authorize(credentials) {
         const result = LoginValidation.safeParse(credentials);
@@ -39,10 +31,7 @@ export const authOptions = {
         
         const { email, password, role } = result.data;
         await dbConnect();
-        console.log(result.data);
-        // ==========================================
         // ROUTE A: BARBER LOGIN
-        // ==========================================
         if (role === "barber") {
           const barber = await Barber.findOne({ email });
           if (!barber) throw new Error("No barber account found.");
@@ -57,10 +46,7 @@ export const authOptions = {
             role: "barber",
           };
         } 
-        
-        // ==========================================
         // ROUTE B: CUSTOMER LOGIN
-        // ==========================================
         else if (role === "customer") {
           const user = await User.findOne({ email });
           if (!user) throw new Error("No customer account found.");
@@ -77,17 +63,14 @@ export const authOptions = {
           };
         }
 
-        // If a hacker tampers with the role field
         throw new Error("Invalid login type specified");
       },
     }),
   ],
 
   callbacks: {
-    // ----------------------------------------------------
-    // Google SignIn Handler (Creates/Finds Customer)
-    // ----------------------------------------------------
     async signIn({ user, account }) {
+      //since we are using adpter we can remove the below code,no need for it , next will itself create if needed
       await dbConnect();
       if (account.provider === "credentials") return true;
 
@@ -105,10 +88,6 @@ export const authOptions = {
       user.role = "customer";
       return true;
     },
-
-    // ----------------------------------------------------
-    // The Bottleneck (Hashes IDs perfectly for EVERYONE)
-    // ----------------------------------------------------
     async jwt({ token, user }) {
       if (user) {
         const rawId = user.id || user._id?.toString();

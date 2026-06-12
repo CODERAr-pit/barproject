@@ -80,15 +80,17 @@ export const BarberValidation = z.object({
 });
 
 // 3. BOOKING SCHEMA VALIDATION
-// 3. BOOKING SCHEMA VALIDATION
+
 export const BookingValidation = z.object({
-  barber: hashedMongoId,
-  user: hashedMongoId, 
-  date: z.string(), // Frontend sends "YYYY-MM-DD" string
-  start: z.coerce.date(), // Matches frontend
-  end: z.coerce.date(),   // Matches frontend
+  barber: z.string(),
+  user: z.string(), 
   
-  service: z.array(z.string()).min(1, "At least one service must be selected"), // Matches frontend
+  date: z.string(), 
+  
+  start: z.string(), 
+  end: z.string(),   
+  
+  service: z.array(z.string()).min(1, "At least one service must be selected"), 
   status: z.enum(["confirmed", "empty"]).default("empty").optional(),
 });
 
@@ -102,10 +104,11 @@ export const LoginValidation = z.object({
 
 //searchparams validation
 export const GetQueryValidation = z.object({
-  userId: hashedMongoId.optional(),
-  barberId: hashedMongoId.optional(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD format").optional(),
-  scope: z.enum(["upcoming"]).optional(),
+  userId: z.string().optional(),    // 👈 Used by the History Page
+  barberId: z.string().optional(),  // 👈 Used by Dashboard & Slots
+  date: z.string().optional(),      // 👈 Used by Slots
+  scope: z.string().optional(),     // 👈 Used by Dashboard
+  duration: z.string().optional(),  // 👈 Used by Slots
 });
 
 export const UpdateBarberValidation = z.object({
